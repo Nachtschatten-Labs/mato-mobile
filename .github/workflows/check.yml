@@ -1,0 +1,29 @@
+name: Mobile checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.3.4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm check
+      - run: pnpm format:check
+      - run: pnpm exec expo install --check
+      - run: pnpm export:android
+        env:
+          EXPO_NO_TELEMETRY: '1'
+          EXPO_PUBLIC_ENABLE_TRANSACTIONS: 'false'
