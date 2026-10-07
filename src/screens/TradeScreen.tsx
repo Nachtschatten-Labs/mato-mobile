@@ -13,18 +13,11 @@ import {
   View,
 } from 'react-native'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import {
-  ArrowDown,
-  ChevronDown,
-  Clock3,
-  SlidersHorizontal,
-  Zap,
-} from 'lucide-react-native'
+import { ChevronDown, SlidersHorizontal, Zap } from 'lucide-react-native'
 import * as Haptics from 'expo-haptics'
 import {
   Button,
   Card,
-  Divider,
   EmptyState,
   ErrorNotice,
   Label,
@@ -32,6 +25,8 @@ import {
   Screen,
   Text,
 } from '@/components/ui'
+import PositionsScreen from './PositionsScreen'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { PriceChart } from '@/components/PriceChart'
 import { colors, fonts } from '@/theme'
 import { config } from '@/config'
@@ -99,6 +94,7 @@ const ranges = {
 
 export default function TradeScreen() {
   const wallet = useWallet()
+  const insets = useSafeAreaInsets()
   const foreground = useForeground()
   const queryClient = useQueryClient()
   const stateQuery = useNativeMarketState()
@@ -228,7 +224,6 @@ export default function TradeScreen() {
     durationSlots === null
       ? 'Waiting for liquidity'
       : formatSmartDuration(durationSlots * 0.2)
-  const color = isBuy ? colors.positive : colors.negative
   const stale =
     stateQuery.isError || Date.now() - stateQuery.dataUpdatedAt > 20_000
   const validation = validateOrder({
@@ -368,6 +363,7 @@ export default function TradeScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <Screen
+        contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 16) }}
         refreshControl={
           <RefreshControl
             tintColor={colors.accent}
@@ -376,26 +372,202 @@ export default function TradeScreen() {
           />
         }
       >
-        <Row>
-          <View>
-            <Label style={s.eyebrow}>THE STREAMING EXCHANGE</Label>
-            <Text style={s.heading}>Trade at your pace.</Text>
+        <Card>
+          <View style={s.sideControl}>
+            {(['buy', 'sell'] as const).map((value) => (
+              <Pressable
+                key={value}
+                onPress={() => changeSide(value)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: side === value }}
+                style={[
+                  s.sideButton,
+                  side === value && {
+                    backgroundColor: colors.elevated,
+                  },
+                ]}
+              >
+                <Text
+                  style={{
+                    fontFamily: fonts.medium,
+                    color: side === value ? colors.text : colors.muted,
+                  }}
+                >
+                  {value === 'buy' ? 'Buy' : 'Sell'}
+                </Text>
+              </Pressable>
+            ))}
           </View>
-          <View style={s.liveBadge}>
-            <View
-              style={[
-                s.liveDot,
-                {
-                  backgroundColor: price.isError
-                    ? colors.negative
-                    : colors.positive,
-                },
-              ]}
+          <View style={s.amountBox}>
+            <Row>
+              <Label>{isBuy ? 'Buy with' : 'Sell'}</Label>
+              {wallet.address && (
+                <Label>
+                  {available === null
+                    ? 'Balance —'
+                    : `Available ${formatAtoms(available, decimals, 4)}`}
+                </Label>
+              )}
+            </Row>
+            <Row>
+              <TextInput
+                accessibilityLabel={`Amount to pay in ${inputToken}`}
+                keyboardType="decimal-pad"
+                inputMode="decimal"
+                value={amount}
+                onChangeText={(text) => {
+                  setAmount(sanitizeAmountInput(text))
+                  setError(null)
+                }}
+                placeholder="0"
+                placeholderTextColor="#555651"
+                maxLength={24}
+                style={s.amountInput}
+              />
+              <Row style={{ gap: 8 }}>
+                <TokenMark token={inputToken} size={24} />
+                <Text style={{ fontFamily: fonts.medium }}>{inputToken}</Text>
+              </Row>
+            </Row>
+            {wallet.address && (
+              <Row>
+                <Label>
+                  Min. {formatAtoms(minimum, decimals)} {inputToken}
+                </Label>
+                <View style={s.inline}>
+                  {[25, 50, 100].map((percent) => (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Use ${percent} percent of available balance`}
+                      key={percent}
+                      disabled={available === null}
+                      onPress={() =>
+                        setAmount(
+                          formatAtomsToInput(
+                            atomsFromPercent(available!, percent),
+                            decimals,
+                          ),
+                        )
+                      }
+                      style={s.percent}
+                    >
+                      <Text style={s.percentText}>
+                        {percent === 100 ? 'MAX' : `${percent}%`}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </Row>
+            )}
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Choose order duration"
+            onPress={() => setDurationOpen(true)}
+          >
+            <Row>
+              <Row style={{ gap: 10 }}>
+                <View style={s.zap}>
+                  <Zap size={17} color={colors.accent} />
+                </View>
+                <View>
+                  <Text style={{ fontFamily: fonts.medium }}>Duration</Text>
+                  <Label>{durationLabel}</Label>
+                </View>
+              </Row>
+              <ChevronDown size={18} color={colors.muted} />
+            </Row>
+          </Pressable>
+          <View style={s.receiveBox}>
+            <Row>
+              <View>
+                <Label>Est. receive</Label>
+                <Text style={s.receive}>
+                  {receive === null
+                    ? '—'
+                    : `≈ ${receive.toLocaleString(undefined, { maximumFractionDigits: isBuy ? 6 : 3 })}`}{' '}
+                  <Text style={{ color: colors.muted }}>{outputToken}</Text>
+                </Text>
+              </View>
+              <TokenMark token={outputToken} />
+            </Row>
+          </View>
+          {atoms !== null && atoms > 0n && (
+            <View style={{ gap: 8 }}>
+              <Row>
+                <Label>Price impact</Label>
+                <Text
+                  style={{
+                    fontFamily: fonts.mono,
+                    fontSize: 12,
+                    color: isHighPriceImpact(impact)
+                      ? colors.negative
+                      : colors.text,
+                  }}
+                >
+                  {impact === null
+                    ? '—'
+                    : `${impact < 0.001 ? '<0.001' : impact.toFixed(3)}%`}
+                </Text>
+              </Row>
+              <Row>
+                <Label>Indicative execution price</Label>
+                <Text style={{ fontFamily: fonts.mono, fontSize: 12 }}>
+                  {execution === null ? '—' : `$${formatPrice(execution)}`}
+                </Text>
+              </Row>
+            </View>
+          )}
+          <Label>
+            1 SOL ≈ {priceValue === null ? '—' : formatPrice(priceValue)} USDC
+          </Label>
+          {stateQuery.isError && (
+            <ErrorNotice message="On-chain market data is unavailable. Pull to refresh." />
+          )}
+          {balances.isError && wallet.address && (
+            <ErrorNotice
+              message="Wallet balances could not be refreshed."
+              retry={() => {
+                void balances.refetch()
+              }}
             />
-            <Label>{price.isError ? 'Unavailable' : 'SOLANA'}</Label>
-          </View>
-        </Row>
-        <Card style={{ gap: 20 }}>
+          )}
+          {error && <ErrorNotice message={error} />}
+          {signature && (
+            <View style={s.success}>
+              <Text style={{ color: colors.positive }}>
+                Your order is streaming.
+              </Text>
+              <Button
+                title="View transaction ↗"
+                variant="ghost"
+                onPress={() => {
+                  void Linking.openURL(
+                    `https://explorer.solana.com/tx/${signature}`,
+                  )
+                }}
+              />
+            </View>
+          )}
+          <Button
+            title={
+              !wallet.supported
+                ? 'Open on Android to connect'
+                : !wallet.address
+                  ? 'Connect wallet to stream'
+                  : !config.transactionsEnabled
+                    ? 'Trading disabled in preview'
+                    : `Review ${side} order`
+            }
+            onPress={review}
+            loading={pending || wallet.isConnecting}
+            disabled={
+              !wallet.supported ||
+              Boolean(wallet.address && !config.transactionsEnabled)
+            }
+          />
+        </Card>
+        <Card style={{ gap: 12 }}>
           <Row>
             <Row style={{ justifyContent: 'flex-start' }}>
               <TokenMark token="SOL" />
@@ -403,33 +575,29 @@ export default function TradeScreen() {
                 <Text style={s.marketName}>
                   SOL <Text style={{ color: colors.muted }}>/ USDC</Text>
                 </Text>
-                <Label>Solana</Label>
               </View>
             </Row>
-            <Label>Market 01</Label>
-          </Row>
-          <Row>
             <Text style={s.price}>
               {priceValue === null ? '—' : `$${formatPrice(priceValue)}`}
             </Text>
-            <Text
-              style={[
-                s.priceChange,
-                {
-                  color:
-                    change === null
-                      ? colors.muted
-                      : change >= 0
-                        ? colors.positive
-                        : colors.negative,
-                },
-              ]}
-            >
-              {change === null
-                ? '24h —'
-                : `${change >= 0 ? '+' : ''}${change.toFixed(2)}% 24h`}
-            </Text>
           </Row>
+          <Text
+            style={[
+              s.priceChange,
+              {
+                color:
+                  change === null
+                    ? colors.muted
+                    : change >= 0
+                      ? colors.positive
+                      : colors.negative,
+              },
+            ]}
+          >
+            {change === null
+              ? '24h —'
+              : `${change >= 0 ? '+' : ''}${change.toFixed(2)}% 24h`}
+          </Text>
           <Row>
             <View style={s.inline}>
               <Chip
@@ -506,223 +674,7 @@ export default function TradeScreen() {
             />
           )}
         </Card>
-
-        <Card>
-          <Row>
-            <Text style={s.sectionTitle}>New order</Text>
-            <Row style={{ gap: 5 }}>
-              <Clock3 size={13} color={colors.muted} />
-              <Label>Time-weighted execution</Label>
-            </Row>
-          </Row>
-          <View style={s.sideControl}>
-            {(['buy', 'sell'] as const).map((value) => (
-              <Pressable
-                key={value}
-                onPress={() => changeSide(value)}
-                accessibilityRole="button"
-                accessibilityState={{ selected: side === value }}
-                style={[
-                  s.sideButton,
-                  side === value && {
-                    backgroundColor: value === 'buy' ? '#243022' : '#342323',
-                  },
-                ]}
-              >
-                <Text
-                  style={{
-                    fontFamily: fonts.medium,
-                    color:
-                      side === value
-                        ? value === 'buy'
-                          ? colors.positive
-                          : colors.negative
-                        : colors.muted,
-                  }}
-                >
-                  {value === 'buy' ? 'Buy SOL' : 'Sell SOL'}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-          <View style={s.amountBox}>
-            <Row>
-              <Label>You pay</Label>
-              <Label>
-                {available === null
-                  ? 'Balance —'
-                  : `Available ${formatAtoms(available, decimals, 4)}`}
-              </Label>
-            </Row>
-            <Row>
-              <TextInput
-                accessibilityLabel={`Amount to pay in ${inputToken}`}
-                keyboardType="decimal-pad"
-                inputMode="decimal"
-                value={amount}
-                onChangeText={(text) => {
-                  setAmount(sanitizeAmountInput(text))
-                  setError(null)
-                }}
-                placeholder="0.00"
-                placeholderTextColor="#555651"
-                maxLength={24}
-                style={s.amountInput}
-              />
-              <Row style={{ gap: 8 }}>
-                <TokenMark token={inputToken} size={24} />
-                <Text style={{ fontFamily: fonts.medium }}>{inputToken}</Text>
-              </Row>
-            </Row>
-            <Row>
-              <Label>
-                Min. {formatAtoms(minimum, decimals)} {inputToken}
-              </Label>
-              <View style={s.inline}>
-                {[25, 50, 100].map((percent) => (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`Use ${percent} percent of available balance`}
-                    key={percent}
-                    disabled={available === null}
-                    onPress={() =>
-                      setAmount(
-                        formatAtomsToInput(
-                          atomsFromPercent(available!, percent),
-                          decimals,
-                        ),
-                      )
-                    }
-                    style={s.percent}
-                  >
-                    <Text style={s.percentText}>
-                      {percent === 100 ? 'MAX' : `${percent}%`}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            </Row>
-          </View>
-          <View style={s.swapIndicator}>
-            <ArrowDown size={16} color={colors.muted} />
-          </View>
-          <Row>
-            <View>
-              <Label>Est. receive</Label>
-              <Text style={s.receive}>
-                {receive === null
-                  ? '—'
-                  : `≈ ${receive.toLocaleString(undefined, { maximumFractionDigits: isBuy ? 6 : 3 })}`}{' '}
-                <Text style={{ color: colors.muted }}>{outputToken}</Text>
-              </Text>
-            </View>
-            <TokenMark token={outputToken} />
-          </Row>
-          <Divider />
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Choose order duration"
-            onPress={() => setDurationOpen(true)}
-          >
-            <Row>
-              <Row style={{ gap: 10 }}>
-                <View style={s.zap}>
-                  <Zap size={17} color={colors.accent} />
-                </View>
-                <View>
-                  <Text style={{ fontFamily: fonts.medium }}>
-                    {smart ? 'Smart fill' : 'Custom duration'}
-                  </Text>
-                  <Label>{durationLabel}</Label>
-                </View>
-              </Row>
-              <ChevronDown size={18} color={colors.muted} />
-            </Row>
-          </Pressable>
-          <View style={{ gap: 8 }}>
-            <Row>
-              <Label>Price impact</Label>
-              <Text
-                style={{
-                  fontFamily: fonts.mono,
-                  fontSize: 12,
-                  color: isHighPriceImpact(impact)
-                    ? colors.negative
-                    : colors.text,
-                }}
-              >
-                {impact === null
-                  ? '—'
-                  : `${impact < 0.001 ? '<0.001' : impact.toFixed(3)}%`}
-              </Text>
-            </Row>
-            <Row>
-              <Label>Indicative execution price</Label>
-              <Text style={{ fontFamily: fonts.mono, fontSize: 12 }}>
-                {execution === null ? '—' : `$${formatPrice(execution)}`}
-              </Text>
-            </Row>
-          </View>
-          {stateQuery.isError && (
-            <ErrorNotice message="On-chain market data is unavailable. Pull to refresh." />
-          )}
-          {balances.isError && wallet.address && (
-            <ErrorNotice
-              message="Wallet balances could not be refreshed."
-              retry={() => {
-                void balances.refetch()
-              }}
-            />
-          )}
-          {error && <ErrorNotice message={error} />}
-          {signature && (
-            <View style={s.success}>
-              <Text style={{ color: colors.positive }}>
-                Your order is streaming.
-              </Text>
-              <Button
-                title="View transaction ↗"
-                variant="ghost"
-                onPress={() => {
-                  void Linking.openURL(
-                    `https://explorer.solana.com/tx/${signature}`,
-                  )
-                }}
-              />
-            </View>
-          )}
-          <Button
-            title={
-              !wallet.supported
-                ? 'Open on Android to connect'
-                : !wallet.address
-                  ? 'Connect wallet'
-                  : !config.transactionsEnabled
-                    ? 'Trading disabled in preview'
-                    : `Review ${side} order`
-            }
-            onPress={review}
-            loading={pending || wallet.isConnecting}
-            disabled={
-              !wallet.supported ||
-              Boolean(wallet.address && !config.transactionsEnabled)
-            }
-            style={
-              wallet.address && config.transactionsEnabled
-                ? { backgroundColor: color }
-                : undefined
-            }
-          />
-          <Text style={s.footnote}>
-            Orders stream over time. Estimated returns change with liquidity and
-            exclude protocol fees.
-          </Text>
-        </Card>
-        <View style={s.footer}>
-          <View style={s.footerRule} />
-          <Label>LESS TIMING. MORE TIME IN THE MARKET.</Label>
-          <View style={s.footerRule} />
-        </View>
+        <PositionsScreen embedded />
       </Screen>
 
       <Modal
@@ -734,7 +686,7 @@ export default function TradeScreen() {
         <View style={s.overlay}>
           <View style={s.sheet}>
             <Row>
-              <Text style={s.sectionTitle}>Let time do the work</Text>
+              <Text style={s.sectionTitle}>Duration</Text>
               <Button
                 title="Done"
                 variant="ghost"
@@ -1011,19 +963,10 @@ function OrderBook({
 }
 
 const s = StyleSheet.create({
-  eyebrow: { letterSpacing: 1.5, fontSize: 9, marginBottom: 4 },
-  heading: {
-    fontSize: 25,
-    lineHeight: 32,
-    letterSpacing: -0.5,
-    fontFamily: fonts.medium,
-  },
-  liveBadge: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  liveDot: { width: 5, height: 5, borderRadius: 4 },
   marketName: { fontSize: 18, fontFamily: fonts.medium },
   price: {
-    fontSize: 34,
-    lineHeight: 44,
+    fontSize: 18,
+    lineHeight: 26,
     fontFamily: fonts.mono,
     letterSpacing: -1.2,
   },
@@ -1054,7 +997,7 @@ const s = StyleSheet.create({
   sideControl: {
     flexDirection: 'row',
     backgroundColor: '#0c0c0c',
-    borderRadius: 12,
+    borderRadius: 28,
     padding: 4,
     gap: 4,
   },
@@ -1062,8 +1005,8 @@ const s = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     padding: 11,
-    borderRadius: 9,
-    minHeight: 46,
+    borderRadius: 24,
+    minHeight: 44,
   },
   amountBox: {
     backgroundColor: '#101010',
@@ -1077,10 +1020,10 @@ const s = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     fontFamily: fonts.mono,
-    fontSize: 30,
+    fontSize: 26,
     color: colors.text,
     paddingVertical: 8,
-    minHeight: 54,
+    minHeight: 44,
   },
   percent: {
     paddingVertical: 7,
@@ -1091,33 +1034,15 @@ const s = StyleSheet.create({
     borderRadius: 6,
   },
   percentText: { color: colors.muted, fontSize: 10, fontFamily: fonts.mono },
-  swapIndicator: {
-    alignSelf: 'center',
-    padding: 5,
-    borderRadius: 20,
+  receiveBox: {
+    padding: 14,
+    borderRadius: 10,
     backgroundColor: colors.elevated,
-    marginTop: -24,
-    marginBottom: -8,
-    borderWidth: 4,
-    borderColor: colors.card,
   },
   receive: { fontFamily: fonts.mono, fontSize: 21, lineHeight: 32 },
   zap: { padding: 8, borderRadius: 9, backgroundColor: '#29211b' },
-  footnote: {
-    fontSize: 11,
-    lineHeight: 16,
-    color: colors.muted,
-    textAlign: 'center',
-  },
   success: { padding: 12, borderRadius: 10, backgroundColor: '#1d281b' },
   token: { alignItems: 'center', justifyContent: 'center' },
-  footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 4,
-  },
-  footerRule: { flex: 1, height: 1, backgroundColor: colors.border },
   overlay: {
     flex: 1,
     backgroundColor: '#000000aa',

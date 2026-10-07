@@ -11,7 +11,13 @@ import {
   SafeAreaProvider,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context'
-import { DarkTheme, NavigationContainer } from '@react-navigation/native'
+import {
+  DarkTheme,
+  NavigationContainer,
+  useNavigation,
+  useRoute,
+} from '@react-navigation/native'
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import NetInfo from '@react-native-community/netinfo'
 import {
@@ -20,10 +26,8 @@ import {
   focusManager,
   onlineManager,
 } from '@tanstack/react-query'
-import { ChartNoAxesCombined, Layers, Wallet } from 'lucide-react-native'
 import { WalletProvider, useWallet } from '@/wallet'
 import TradeScreen from '@/screens/TradeScreen'
-import PositionsScreen from '@/screens/PositionsScreen'
 import AccountScreen from '@/screens/AccountScreen'
 import { Button, Text } from '@/components/ui'
 import { colors, fonts } from '@/theme'
@@ -41,11 +45,14 @@ const queryClient = new QueryClient({
     mutations: { retry: false },
   },
 })
-const Tab = createBottomTabNavigator()
+type Routes = { Trade: undefined; Account: undefined }
+const Tab = createBottomTabNavigator<Routes>()
 
 function Header() {
   const insets = useSafeAreaInsets()
   const wallet = useWallet()
+  const navigation = useNavigation<BottomTabNavigationProp<Routes>>()
+  const route = useRoute()
   const [online, setOnline] = useState(true)
   useEffect(
     () =>
@@ -57,34 +64,24 @@ function Header() {
   return (
     <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
       <View style={styles.headerRow}>
-        <View style={styles.brand}>
-          <Text style={styles.wordmark}>
-            mato<Text style={{ color: colors.accent, fontSize: 32 }}>.</Text>
-          </Text>
-          <View style={styles.network}>
-            <View
-              style={[
-                styles.dot,
-                !online && { backgroundColor: colors.negative },
-              ]}
-            />
-            <Text style={styles.networkText}>
-              {online ? 'MAINNET' : 'OFFLINE'}
-            </Text>
-          </View>
-        </View>
+        <Text style={styles.wordmark}>mato</Text>
+        {!online && <Text style={styles.networkText}>Offline</Text>}
         <Button
           title={
-            wallet.address
-              ? `${wallet.address.slice(0, 4)}…${wallet.address.slice(-4)}`
-              : 'Connect wallet'
+            route.name === 'Account'
+              ? 'Back to trading'
+              : wallet.address
+                ? `${wallet.address.slice(0, 4)}…${wallet.address.slice(-4)}`
+                : 'Connect wallet'
           }
           onPress={() => {
-            void wallet.connect().catch(() => {})
+            if (route.name === 'Account') navigation.navigate('Trade')
+            else if (wallet.address) navigation.navigate('Account')
+            else void wallet.connect().catch(() => {})
           }}
           loading={wallet.isConnecting}
           variant="secondary"
-          disabled={!wallet.supported || Boolean(wallet.address)}
+          disabled={!wallet.supported && route.name !== 'Account'}
           style={styles.walletButton}
         />
       </View>
@@ -103,7 +100,6 @@ function Header() {
 }
 
 function Navigation() {
-  const insets = useSafeAreaInsets()
   return (
     <NavigationContainer
       theme={{
@@ -119,36 +115,13 @@ function Navigation() {
       }}
     >
       <Tab.Navigator
-        screenOptions={({ route }) => ({
+        tabBar={() => null}
+        screenOptions={{
           header: () => <Header />,
-          tabBarActiveTintColor: colors.accent,
-          tabBarInactiveTintColor: colors.muted,
-          tabBarStyle: {
-            backgroundColor: colors.background,
-            borderTopColor: colors.border,
-            paddingTop: 8,
-            paddingBottom: Math.max(insets.bottom, 8),
-            height: 64 + Math.max(insets.bottom, 8),
-          },
-          tabBarLabelStyle: {
-            fontFamily: fonts.medium,
-            fontSize: 11,
-            marginBottom: 2,
-          },
-          tabBarIcon: ({ color, size }) => {
-            const Icon =
-              route.name === 'Trade'
-                ? ChartNoAxesCombined
-                : route.name === 'Positions'
-                  ? Layers
-                  : Wallet
-            return <Icon color={color} size={size - 2} />
-          },
           sceneStyle: { backgroundColor: colors.background },
-        })}
+        }}
       >
         <Tab.Screen name="Trade" component={TradeScreen} />
-        <Tab.Screen name="Positions" component={PositionsScreen} />
         <Tab.Screen name="Account" component={AccountScreen} />
       </Tab.Navigator>
     </NavigationContainer>
@@ -230,11 +203,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   header: {
-    paddingHorizontal: 20,
-    paddingBottom: 14,
+    paddingHorizontal: 16,
+    paddingBottom: 10,
     backgroundColor: colors.background,
-    borderBottomWidth: 1,
-    borderBottomColor: '#232323',
   },
   headerRow: {
     flexDirection: 'row',
@@ -242,19 +213,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 10,
   },
-  brand: { gap: 2 },
   wordmark: {
-    fontSize: 32,
-    lineHeight: 38,
-    letterSpacing: -1.5,
+    fontSize: 22,
+    lineHeight: 30,
+    letterSpacing: -0.7,
     fontFamily: fonts.semibold,
-  },
-  network: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  dot: {
-    height: 5,
-    width: 5,
-    backgroundColor: colors.positive,
-    borderRadius: 3,
   },
   networkText: {
     color: colors.muted,

@@ -4,16 +4,16 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "env": { "EXPO_PUBLIC_ENABLE_TRANSACTIONS": "false" }
+      "env": { "EXPO_PUBLIC_ENABLE_TRANSACTIONS": "true" }
     },
     "preview": {
       "distribution": "internal",
       "android": { "buildType": "apk" },
-      "env": { "EXPO_PUBLIC_ENABLE_TRANSACTIONS": "false" }
+      "env": { "EXPO_PUBLIC_ENABLE_TRANSACTIONS": "true" }
     },
     "production": {
       "android": { "buildType": "apk" },
-      "env": { "EXPO_PUBLIC_ENABLE_TRANSACTIONS": "false" }
+      "env": { "EXPO_PUBLIC_ENABLE_TRANSACTIONS": "true" }
     }
   }
 }

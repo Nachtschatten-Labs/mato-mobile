@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Pressable, StyleSheet, View } from 'react-native'
 import { useQuery } from '@tanstack/react-query'
 import { Text } from '../ui'
+import { Drawer } from '../Drawer'
 import { Detail, Sparkline, TransactionLink } from './Shared'
 import { colors } from '../../theme'
 import { rpc } from '../../lib/rpc'
@@ -128,7 +129,7 @@ export default function ClosedPositionCard({
           <Text style={styles.title}>{summary.sideLabel} SOL</Text>
           <Text style={styles.muted}>Closed stream</Text>
         </View>
-        <Text style={styles.muted}>{expanded ? '−' : '+'}</Text>
+        <Text style={styles.muted}>›</Text>
       </Pressable>
       <Text style={styles.amount}>
         {formatAtoms(summary.consumedAtoms, summary.depositDecimals)}{' '}
@@ -144,7 +145,25 @@ export default function ClosedPositionCard({
             : `${formatUiAmount(summary.averageFillPrice, 6)} USDC/SOL`
         }
       />
-      {expanded && (
+      <Drawer
+        visible={expanded}
+        title={`Closed ${summary.sideLabel.toLowerCase()} SOL position`}
+        onClose={() => setExpanded(false)}
+      >
+        <Text style={styles.amount}>
+          {formatAtoms(summary.consumedAtoms, summary.depositDecimals)}{' '}
+          {summary.depositToken} <Text style={styles.muted}>→</Text>{' '}
+          {formatAtoms(summary.receivedAtoms, summary.swappedDecimals)}{' '}
+          {summary.swappedToken}
+        </Text>
+        <Detail
+          label="Average fill before fees"
+          value={
+            summary.averageFillPrice === null
+              ? '—'
+              : `${formatUiAmount(summary.averageFillPrice, 6)} USDC/SOL`
+          }
+        />
         <View style={styles.expanded}>
           <Detail
             label="Output fee"
@@ -162,21 +181,23 @@ export default function ClosedPositionCard({
             label="Trading ended"
             value={displayTime(endSlot, time.data?.end)}
           />
-          {history.isFetching ? (
+          {history.isError ? (
+            <Text style={styles.muted}>Price history is unavailable.</Text>
+          ) : history.isFetching ? (
             <Text style={styles.muted}>Loading price history…</Text>
           ) : (
             <Sparkline points={history.data ?? []} />
           )}
           <TransactionLink signature={event.signature} onError={onError} />
         </View>
-      )}
+      </Drawer>
     </View>
   )
 }
 
 const styles = StyleSheet.create({
   card: {
-    padding: 20,
+    padding: 14,
     gap: 12,
     borderRadius: 20,
     borderWidth: 1,

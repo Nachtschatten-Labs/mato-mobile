@@ -39,13 +39,13 @@ pnpm mainnet:verify      # read-only backend/cluster health check
 - Trade: live SOL/USDC price, line/candle charts, 1H/1D/1W ranges, order book and side filter.
 - Orders: buy/sell, exact atom amounts, available-balance shortcuts, Smart fill, 5-second to 1-year durations, indicative price/impact and a frozen review before wallet approval.
 - Positions: active streams, authoritative fill/refund accounting, pause/resume, withdrawal, simulated settlement review, and batch closing up to two ended streams.
-- History: pagination, fees, refunds, net receipts, explorer links, expandable price charts and actual/explicitly estimated dates.
-- Account: balances, address copy, disconnect, interval-account inventory, and reclaiming eligible rent in batches of ten.
-- Native behavior: bottom tabs, safe areas, keyboard-aware forms, accessible controls, pull-to-refresh, foreground/focused-screen polling, reconnect handling and visible request errors.
+- History: pagination, fees, refunds, net receipts, explorer links, drawer price charts and actual/explicitly estimated dates.
+- Account (open from the connected wallet button): balances, address copy, disconnect, interval-account inventory, and reclaiming eligible rent in batches of ten.
+- Native behavior: a single order-first trading page, Active/Closed position drawers, safe areas, keyboard-aware forms, accessible controls, pull-to-refresh, foreground/focused-screen polling, reconnect handling and visible request errors.
 
 ## Mainnet configuration
 
-Development and preview builds are read-only. Production also defaults to read-only. To enable transactions in a reviewed release, set both `EXPO_PUBLIC_ENABLE_TRANSACTIONS=true` and `EXPO_PUBLIC_VERIFIED_PROGRAM_ID=TwobwMYkKbT8uMWqgPrEPXTPoyYsKAPmaWun6T2WT4A` in that build's configuration. The `production` EAS profile explicitly sets the flag to false; change it deliberately when preparing an approved release. Development (`__DEV__`) remains read-only regardless of the flag.
+Android trading is enabled by default in local development and all EAS profiles. Each order still requires review and approval in the connected wallet. Set `EXPO_PUBLIC_ENABLE_TRANSACTIONS=false` to explicitly build a read-only client. The program ID remains pinned; an explicitly supplied `EXPO_PUBLIC_VERIFIED_PROGRAM_ID` must match `TwobwMYkKbT8uMWqgPrEPXTPoyYsKAPmaWun6T2WT4A`. Web and iOS still provide a visual preview because wallet signing is Android-only.
 
 All `EXPO_PUBLIC_*` configuration is public inside the app binary. Use a credential-free HTTPS RPC proxy that keeps provider secrets on your server. The public mainnet RPC is a development fallback with rate limits and possible browser-origin restrictions; production needs a reliable endpoint. The read API has its own availability and latency. No prices, balances or histories are fabricated when a service is unavailable.
 

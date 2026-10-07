@@ -15,9 +15,11 @@ export function validateEndpoint(raw: string, label: string) {
 export function canEnableTransactions(
   enabled: string | undefined,
   verifiedProgram: string | undefined,
-  development: boolean,
 ) {
-  return !development && enabled === 'true' && verifiedProgram === PROGRAM_ID
+  return (
+    (enabled === undefined || enabled === 'true') &&
+    (verifiedProgram === undefined || verifiedProgram === PROGRAM_ID)
+  )
 }
 
 export const config = Object.freeze({
@@ -36,8 +38,5 @@ export const config = Object.freeze({
   transactionsEnabled: canEnableTransactions(
     process.env.EXPO_PUBLIC_ENABLE_TRANSACTIONS,
     process.env.EXPO_PUBLIC_VERIFIED_PROGRAM_ID,
-    typeof __DEV__ !== 'undefined'
-      ? __DEV__
-      : process.env.NODE_ENV !== 'production',
   ),
 })

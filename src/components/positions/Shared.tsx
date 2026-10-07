@@ -83,7 +83,7 @@ export function Sparkline({
         <Polyline
           points={path}
           fill="none"
-          stroke={colors.accent}
+          stroke={colors.chart}
           strokeWidth="2"
         />
       </Svg>

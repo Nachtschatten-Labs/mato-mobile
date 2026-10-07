@@ -161,9 +161,7 @@ export default function AccountScreen() {
         />
       }
     >
-      <Text style={styles.eyebrow}>YOUR WALLET</Text>
       <Text style={styles.title}>Account</Text>
-      <Text style={styles.subtitle}>Your keys stay with your wallet.</Text>
       <View style={styles.card}>
         <View style={styles.walletMark}>
           <Text style={{ fontSize: 30, lineHeight: 36, color: colors.accent }}>
@@ -199,10 +197,8 @@ export default function AccountScreen() {
           </>
         ) : (
           <>
-            <Text style={styles.sectionTitle}>Make yourself at home</Text>
             <Text style={styles.subtitle}>
-              Connect a Solana wallet to trade, track your streams and reclaim
-              account rent.
+              Connect your wallet to manage balances and account rent.
             </Text>
             {!wallet.supported && (
               <Notice>
@@ -439,7 +435,6 @@ export default function AccountScreen() {
         />
       )}
       {error && <Notice error>{error}</Notice>}
-      <Text style={styles.footer}>mato · built for Solana Mobile</Text>
     </ScrollView>
   )
 }
