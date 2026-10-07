@@ -51,7 +51,11 @@ import type { TradePositionRecord } from '../features/trading/domain/models'
 const PAGE_SIZE = 20
 type Review = { owner: Address; positions: TradePositionRecord[]; id: number }
 
-export default function PositionsScreen() {
+export default function PositionsScreen({
+  embedded = false,
+}: {
+  embedded?: boolean
+}) {
   const wallet = useWallet()
   const client = useQueryClient()
   const active = useForeground()
@@ -260,23 +264,25 @@ export default function PositionsScreen() {
       (closed.data?.pages.flat() ?? []).map((event) => [event.id, event]),
     ).values(),
   )
+  const Container = embedded ? View : ScrollView
   return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      refreshControl={
-        <RefreshControl
-          tintColor={colors.accent}
-          refreshing={refreshing}
-          onRefresh={() => {
-            void client.invalidateQueries({ queryKey: ['mobile'] })
-          }}
-        />
-      }
+    <Container
+      style={embedded ? styles.embedded : styles.screen}
+      {...(!embedded
+        ? {
+            contentContainerStyle: styles.content,
+            refreshControl: (
+              <RefreshControl
+                tintColor={colors.accent}
+                refreshing={refreshing}
+                onRefresh={() => {
+                  void client.invalidateQueries({ queryKey: ['mobile'] })
+                }}
+              />
+            ),
+          }
+        : {})}
     >
-      <Text style={styles.eyebrow}>YOUR ACTIVITY</Text>
-      <Text style={styles.title}>Positions</Text>
-      <Text style={styles.subtitle}>Every stream, at your pace.</Text>
       <View style={styles.tabs}>
         {(['active', 'closed'] as const).map((value) => (
           <Pressable
@@ -289,17 +295,15 @@ export default function PositionsScreen() {
             <Text style={{ color: tab === value ? colors.text : colors.muted }}>
               {value === 'active'
                 ? `Active${positions.data?.length ? ` · ${positions.data.length}` : ''}`
-                : 'History'}
+                : 'Closed'}
             </Text>
           </Pressable>
         ))}
       </View>
       {!wallet.address ? (
         <View style={styles.empty}>
-          <Text style={styles.emptyIcon}>↗</Text>
-          <Text style={styles.emptyTitle}>Your streams live here</Text>
           <Text style={styles.subtitle}>
-            Connect your wallet to follow active trades and see your history.
+            Connect a wallet to see your streams.
           </Text>
           <Button
             title={wallet.isConnecting ? 'Connecting…' : 'Connect wallet'}
@@ -574,11 +578,19 @@ export default function PositionsScreen() {
           </ScrollView>
         </SafeAreaView>
       </Modal>
-    </ScrollView>
+    </Container>
   )
 }
 
 const styles = StyleSheet.create({
+  embedded: {
+    gap: 12,
+    padding: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+  },
   screen: { flex: 1, backgroundColor: colors.background },
   content: {
     padding: 20,
@@ -614,9 +626,9 @@ const styles = StyleSheet.create({
   },
   selectedTab: { backgroundColor: colors.elevated },
   empty: {
-    padding: 28,
+    padding: 12,
     gap: 16,
-    marginVertical: 20,
+    marginVertical: 8,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: colors.border,

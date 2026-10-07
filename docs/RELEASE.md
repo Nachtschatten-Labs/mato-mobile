@@ -15,11 +15,12 @@ This repository contains an Android-first implementation. The ARM64 debug APK ha
 
 - Launch on a physical Seeker/Saga or supported Android phone with an MWA wallet. Confirm local bundled fonts, splash, safe areas, Android back, keyboard, large text and screen-reader controls.
 - Connect, reject connection, reconnect after process death, revoke wallet authorization, switch accounts, disconnect while a wallet request is pending, and uninstall/reinstall. Old authorization must not return from Android backup.
+- Confirm there is no bottom navigation or marketing heading. Open active and closed positions, scroll the drawers, and dismiss using the close button, backdrop, Android back, or handle swipe. Check the connected wallet button opens Account and returns to trading.
 - Inspect chart ranges, line/candle mode, order-book filters, paused/zero-flow markets, unavailable prices, offline/reconnection, API errors and foreground/background polling.
-- Confirm previews cannot submit even with a connected wallet. Verify public RPC rate-limit errors appear without fake values.
-- In a separately reviewed transaction-enabled release, verify buy/sell reviews, high-impact acknowledgment, account changes, Smart fill duration stability, insufficient balance, missing receiving ATA, partial wrapped SOL, cancellation and confirmation timeout. Use controlled funds and explicitly approved transactions.
+- Confirm an explicitly disabled build (`EXPO_PUBLIC_ENABLE_TRANSACTIONS=false`) cannot submit even with a connected wallet. Default Android development, preview and production builds allow wallet-approved trades. Verify public RPC rate-limit errors appear without fake values.
+- In a transaction-enabled Android build, verify buy/sell reviews, high-impact acknowledgment, account changes, Smart fill duration stability, insufficient balance, missing receiving ATA, partial wrapped SOL, cancellation and confirmation timeout. Use controlled funds and explicitly approved transactions.
 - Exercise pause/resume/withdraw and close simulations against known positions. Compare end-slot settlement, inactive-slot refunds, net fees and receiver addresses with on-chain results. Check a two-position batch close and ten-account rent batch, including failure/retry behavior.
-- During confirmation, switch tabs and attempt another mutation: it must fail without silently queueing. If confirmation becomes unknown, inspect the preserved transaction signature before retrying.
+- During confirmation, open account controls and attempt another mutation: it must fail without silently queueing. If confirmation becomes unknown, inspect the preserved transaction signature before retrying.
 
 ## Checks
 

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Pressable, StyleSheet, View } from 'react-native'
 import { useQuery } from '@tanstack/react-query'
 import { Text, Button } from './ui'
+import { Drawer } from './Drawer'
 import { Detail, Sparkline } from './positions/Shared'
 import { colors } from '../theme'
 import { rpc } from '../lib/rpc'
@@ -136,57 +137,73 @@ export default function PositionCard({
             {state}
           </Text>
         </View>
-        <Text style={styles.muted}>{expanded ? '−' : '+'}</Text>
+        <Text style={styles.muted}>›</Text>
       </Pressable>
-      <View style={styles.amounts}>
-        <Text style={styles.label}>Spent / deposited</Text>
-        <Text style={styles.amount}>
-          {unavailable(metrics.consumedAtoms, metrics.depositedDecimals)}{' '}
-          <Text style={styles.muted}>
-            / {formatAtoms(metrics.amountAtoms, metrics.depositedDecimals)}{' '}
-            {metrics.depositedToken}
-          </Text>
+      <Text style={styles.muted}>
+        {unavailable(metrics.consumedAtoms, metrics.depositedDecimals)} /{' '}
+        {formatAtoms(metrics.amountAtoms, metrics.depositedDecimals)}{' '}
+        {metrics.depositedToken}
+        {' · '}
+        {metrics.progressPercent === null
+          ? 'Updating fill…'
+          : `${progress.toFixed(1)}% filled`}
+      </Text>
+      <Drawer
+        visible={expanded}
+        title={`${metrics.sideLabel} SOL`}
+        onClose={() => setExpanded(false)}
+      >
+        <Text style={styles.muted}>
+          {state} · {metrics.flowLabel}
         </Text>
-        <View
-          accessibilityRole="progressbar"
-          accessibilityValue={
-            metrics.progressPercent === null
-              ? { text: 'Updating fill' }
-              : { min: 0, max: 100, now: progress }
+        <View style={styles.amounts}>
+          <Text style={styles.label}>Spent / deposited</Text>
+          <Text style={styles.amount}>
+            {unavailable(metrics.consumedAtoms, metrics.depositedDecimals)}{' '}
+            <Text style={styles.muted}>
+              / {formatAtoms(metrics.amountAtoms, metrics.depositedDecimals)}{' '}
+              {metrics.depositedToken}
+            </Text>
+          </Text>
+          <View
+            accessibilityRole="progressbar"
+            accessibilityValue={
+              metrics.progressPercent === null
+                ? { text: 'Updating fill' }
+                : { min: 0, max: 100, now: progress }
+            }
+            style={styles.track}
+          >
+            <View style={[styles.fill, { width: `${progress}%` }]} />
+          </View>
+          <View style={styles.line}>
+            <Text style={styles.muted}>
+              {metrics.progressPercent === null
+                ? 'Updating fill…'
+                : `${progress.toFixed(1)}% filled`}
+            </Text>
+            <Text style={styles.muted}>
+              {metrics.isPaused ? 'Time remaining: ' : ''}
+              {ended
+                ? 'Ready to settle'
+                : market
+                  ? formatStreamDuration(remainingSlots * SLOT_DURATION_SECONDS)
+                  : 'Time unavailable'}
+            </Text>
+          </View>
+        </View>
+        <Detail
+          label="Received before fees"
+          value={`${unavailable(metrics.swappedAtoms, metrics.swappedDecimals)} ${metrics.swappedToken}`}
+        />
+        <Detail
+          label="Average fill"
+          value={
+            metrics.averagePrice === null
+              ? '—'
+              : `${formatUiAmount(metrics.averagePrice, 6)} USDC/SOL`
           }
-          style={styles.track}
-        >
-          <View style={[styles.fill, { width: `${progress}%` }]} />
-        </View>
-        <View style={styles.line}>
-          <Text style={styles.muted}>
-            {metrics.progressPercent === null
-              ? 'Updating fill…'
-              : `${progress.toFixed(1)}% filled`}
-          </Text>
-          <Text style={styles.muted}>
-            {metrics.isPaused ? 'Time remaining: ' : ''}
-            {ended
-              ? 'Ready to settle'
-              : market
-                ? formatStreamDuration(remainingSlots * SLOT_DURATION_SECONDS)
-                : 'Time unavailable'}
-          </Text>
-        </View>
-      </View>
-      <Detail
-        label="Received before fees"
-        value={`${unavailable(metrics.swappedAtoms, metrics.swappedDecimals)} ${metrics.swappedToken}`}
-      />
-      <Detail
-        label="Average fill"
-        value={
-          metrics.averagePrice === null
-            ? '—'
-            : `${formatUiAmount(metrics.averagePrice, 6)} USDC/SOL`
-        }
-      />
-      {expanded && (
+        />
         <View style={styles.expanded}>
           <Detail
             label="Refundable input"
@@ -200,7 +217,9 @@ export default function PositionCard({
             label="Position"
             value={shortenAddress(position.address, 6, 6)}
           />
-          {chart.isPending ? (
+          {chart.isError ? (
+            <Text style={styles.muted}>Price history is unavailable.</Text>
+          ) : chart.isPending ? (
             <Text style={styles.muted}>Loading price history…</Text>
           ) : (
             <Sparkline points={chart.data ?? []} />
@@ -211,35 +230,42 @@ export default function PositionCard({
             disabled={
               disabled || pending || (metrics.claimableSwappedAtoms ?? 0n) <= 0n
             }
-            onPress={() => onAction(position, 'withdraw')}
+            onPress={() => {
+              setExpanded(false)
+              onAction(position, 'withdraw')
+            }}
           />
         </View>
-      )}
-      <View style={styles.actions}>
-        <View style={styles.action}>
-          <Button
-            title={metrics.isPaused ? 'Resume' : 'Pause'}
-            variant="secondary"
-            disabled={
-              disabled ||
-              pending ||
-              (!metrics.isPaused && ended) ||
-              (metrics.isPaused && Boolean(market?.isPaused))
-            }
-            onPress={() =>
-              onAction(position, metrics.isPaused ? 'resume' : 'pause')
-            }
-          />
+        <View style={styles.actions}>
+          <View style={styles.action}>
+            <Button
+              title={metrics.isPaused ? 'Resume' : 'Pause'}
+              variant="secondary"
+              disabled={
+                disabled ||
+                pending ||
+                (!metrics.isPaused && ended) ||
+                (metrics.isPaused && Boolean(market?.isPaused))
+              }
+              onPress={() => {
+                setExpanded(false)
+                onAction(position, metrics.isPaused ? 'resume' : 'pause')
+              }}
+            />
+          </View>
+          <View style={styles.action}>
+            <Button
+              title={pending ? 'Confirming…' : 'Close stream'}
+              variant="ghost"
+              disabled={disabled || pending}
+              onPress={() => {
+                setExpanded(false)
+                onAction(position, 'close')
+              }}
+            />
+          </View>
         </View>
-        <View style={styles.action}>
-          <Button
-            title={pending ? 'Confirming…' : 'Close stream'}
-            variant="ghost"
-            disabled={disabled || pending}
-            onPress={() => onAction(position, 'close')}
-          />
-        </View>
-      </View>
+      </Drawer>
     </View>
   )
 }
@@ -250,7 +276,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: 20,
+    padding: 14,
     gap: 8,
   },
   header: {

@@ -49,8 +49,8 @@ export function PriceChart({
       <Svg width="100%" height={height}>
         <Defs>
           <LinearGradient id="fill" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor={colors.accent} stopOpacity={0.2} />
-            <Stop offset="1" stopColor={colors.accent} stopOpacity={0} />
+            <Stop offset="0" stopColor={colors.chart} stopOpacity={0.2} />
+            <Stop offset="1" stopColor={colors.chart} stopOpacity={0} />
           </LinearGradient>
         </Defs>
         {[0.25, 0.5, 0.75].map((t) => (
@@ -70,7 +70,7 @@ export function PriceChart({
               d={`${path} L${x(candles.length - 1)},${height} L4,${height} Z`}
               fill="url(#fill)"
             />
-            <Path d={path} stroke={colors.accent} strokeWidth={2} fill="none" />
+            <Path d={path} stroke={colors.chart} strokeWidth={2} fill="none" />
           </>
         ) : (
           candles.map((c, i) => {
