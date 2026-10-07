@@ -1,0 +1,70 @@
+{
+  "name": "mato-mobile",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.ts",
+  "packageManager": "pnpm@12.3.4",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "start": "expo start --dev-client",
+    "android": "node scripts/android.mjs",
+    "ios": "expo run:ios",
+    "web": "expo start --web",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "check": "pnpm typecheck && pnpm test",
+    "export:android": "expo export --platform android",
+    "export:web": "expo export --platform web",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "mainnet:verify": "node --env-file-if-exists=.env scripts/verify-mainnet.mjs"
+  },
+  "dependencies": {
+    "@expo-google-fonts/ibm-plex-mono": "0.4.1",
+    "@expo-google-fonts/ibm-plex-sans": "0.4.1",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-community/netinfo": "12.0.1",
+    "@react-navigation/bottom-tabs": "7.20.0",
+    "@react-navigation/native": "7.5.0",
+    "@solana/kit": "6.5.0",
+    "@solana/program-client-core": "6.5.0",
+    "@tanstack/react-query": "5.102.8",
+    "@wallet-ui/react-native-kit": "4.2.1",
+    "expo": "57.0.27",
+    "expo-clipboard": "57.0.2",
+    "expo-dev-client": "57.0.19",
+    "expo-font": "57.0.4",
+    "expo-haptics": "57.0.3",
+    "expo-secure-store": "57.0.4",
+    "expo-splash-screen": "57.0.9",
+    "expo-status-bar": "57.0.1",
+    "expo-system-ui": "57.0.4",
+    "lucide-react-native": "1.52.0",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-nitro-modules": "0.37.1",
+    "react-native-quick-base64": "3.0.1",
+    "react-native-quick-crypto": "1.1.7",
+    "react-native-safe-area-context": "5.7.0",
+    "react-native-screens": "4.26.2",
+    "react-native-svg": "15.15.4",
+    "react-native-web": "0.21.2"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.3",
+    "@types/react": "19.2.18",
+    "prettier": "3.9.6",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
+  },
+  "expo": {
+    "install": {
+      "exclude": [
+        "typescript"
+      ]
+    }
+  }
+}

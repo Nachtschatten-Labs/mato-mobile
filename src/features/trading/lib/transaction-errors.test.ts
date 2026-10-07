@@ -1,0 +1,180 @@
+import { describe, expect, it } from 'vitest'
+import {
+  SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR,
+  SolanaError,
+} from '@solana/kit'
+import { formatTransactionError } from './transaction-errors'
+
+describe('formatTransactionError', () => {
+  it('prefers the nested failed transaction error over the generic planner error', () => {
+    const error = {
+      context: {
+        transactionPlanResult: {
+          kind: 'single',
+          status: 'failed',
+          error: {
+            context: {
+              logs: ['Program log: one', 'Program log: two'],
+            },
+            message: 'custom program error: 0x1',
+          },
+        },
+      },
+      message: 'The provided transaction plan failed to execute.',
+    }
+
+    expect(formatTransactionError(error, 'fallback')).toBe(
+      'custom program error: 0x1 Logs: Program log: one | Program log: two',
+    )
+  })
+
+  it('uses the direct error message when the error is already specific', () => {
+    expect(
+      formatTransactionError(new Error('Insufficient funds'), 'fallback'),
+    ).toBe('Insufficient funds')
+  })
+
+  it('falls back when there is no readable detail', () => {
+    expect(
+      formatTransactionError(
+        { message: 'The provided transaction plan failed to execute.' },
+        'fallback',
+      ),
+    ).toBe('fallback')
+  })
+
+  it('explains when the RPC provider is rate-limiting requests', () => {
+    const error = new SolanaError(SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR, {
+      headers: new Headers(),
+      message: '',
+      statusCode: 429,
+    })
+
+    expect(formatTransactionError(error, 'fallback')).toBe(
+      'The Solana RPC is temporarily rate-limited. Please wait a few seconds and try again.',
+    )
+  })
+
+  it('adds a plan hint when the planner only returns structured metadata', () => {
+    const error = {
+      context: {
+        transactionPlanResult: {
+          kind: 'single',
+          status: 'failed',
+          error: {
+            code: '1001',
+            name: 'SimulationFailure',
+            reason: 'Instruction 0 failed',
+          },
+        },
+      },
+      message: 'The provided transaction plan failed to execute.',
+    }
+
+    expect(formatTransactionError(error, 'fallback')).toBe(
+      'fallback Details: SimulationFailure / 1001 / Instruction 0 failed',
+    )
+  })
+
+  it('asks for a retry when signing crossed a market account boundary', () => {
+    const error = new Error(
+      'Transaction failed during confirmation: {"InstructionError":[0,{"Custom":6006}]}',
+    )
+
+    expect(formatTransactionError(error, 'fallback')).toBe(
+      'Market timing changed while the transaction was awaiting wallet approval. Please try again.',
+    )
+  })
+
+  it.each([6007, 6010])(
+    'asks for a retry when market state error %s is stale',
+    (code) => {
+      const error = new Error(
+        `Transaction failed during confirmation: {"InstructionError":[0,{"Custom":${code}}]}`,
+      )
+
+      expect(formatTransactionError(error, 'fallback')).toBe(
+        'Market timing changed while the transaction was awaiting wallet approval. Please try again.',
+      )
+    },
+  )
+
+  it('explains when no newly swapped funds are available', () => {
+    const error = new Error(
+      'Transaction failed during confirmation: {"InstructionError":[0,{"Custom":6038}]}',
+    )
+
+    expect(formatTransactionError(error, 'fallback')).toBe(
+      'There are no new swapped funds to withdraw yet.',
+    )
+  })
+
+  it.each([
+    [6036, 'This position is already paused.'],
+    [6037, 'This position is not paused.'],
+    [6038, 'There are no new swapped funds to withdraw yet.'],
+  ])('decodes the current structured position error %s', (code, message) => {
+    expect(
+      formatTransactionError(
+        { context: { __code: 4_615_026, code } },
+        'fallback',
+      ),
+    ).toBe(message)
+  })
+
+  it('does not interpret an old AmountZero code as a withdrawal error', () => {
+    const message = 'Transaction failed: {"Custom":6031}'
+    expect(formatTransactionError(new Error(message), 'fallback')).toBe(message)
+  })
+
+  it('explains the insecure wallet browser error', () => {
+    const error = {
+      context: { __code: 3_610_000 },
+      message:
+        'Solana error #3610000: Decode this error by running `npx @solana/errors decode -- 3610000`',
+    }
+
+    expect(formatTransactionError(error, 'fallback')).toBe(
+      'This device cannot securely prepare Solana transactions. Update Mato and your wallet app, then try again.',
+    )
+  })
+
+  it('decodes the production Solana message inside a failed plan', () => {
+    const error = {
+      context: {
+        transactionPlanResult: {
+          kind: 'single',
+          status: 'failed',
+          error: {
+            message:
+              'Solana error #3610000: Decode this error by running `npx @solana/errors decode -- 3610000`',
+          },
+        },
+      },
+      message: 'The provided transaction plan failed to execute.',
+    }
+
+    expect(formatTransactionError(error, 'fallback')).toBe(
+      'This device cannot securely prepare Solana transactions. Update Mato and your wallet app, then try again.',
+    )
+  })
+
+  it('explains the production wrong-exits-account error', () => {
+    const error = {
+      context: {
+        __code: 4_615_026,
+        code: 6006,
+        logs: [
+          'Program CCAmAqvza37EWzou7LoYCaGKzdJsCu1CLPMp3Wvx3Bc5 consumed 54787 of 200000 compute units',
+          'Program CCAmAqvza37EWzou7LoYCaGKzdJsCu1CLPMp3Wvx3Bc5 failed: custom program error: 0x1776',
+        ],
+      },
+      message:
+        'Solana error #4615026: Decode this error by running `npx @solana/errors decode -- 4615026`',
+    }
+
+    expect(formatTransactionError(error, 'fallback')).toBe(
+      'Market timing changed while the transaction was awaiting wallet approval. Please try again.',
+    )
+  })
+})

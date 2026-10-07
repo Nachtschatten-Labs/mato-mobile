@@ -1,0 +1,7 @@
+node_modules
+dist
+dist-web
+android
+ios
+pnpm-lock.yaml
+src/lib/generated
