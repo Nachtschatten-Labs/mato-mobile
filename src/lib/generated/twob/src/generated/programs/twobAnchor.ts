@@ -212,8 +212,7 @@ import {
   findTradePositionPda,
 } from '../pdas'
 
-export const TWOB_ANCHOR_PROGRAM_ADDRESS =
-  'TwobwMYkKbT8uMWqgPrEPXTPoyYsKAPmaWun6T2WT4A' as Address<'TwobwMYkKbT8uMWqgPrEPXTPoyYsKAPmaWun6T2WT4A'>
+export { TWOB_ANCHOR_PROGRAM_ADDRESS } from '../../../program-address'
 
 export enum TwobAnchorAccount {
   LiquidityPosition,

@@ -15,6 +15,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "check": "pnpm typecheck && pnpm test",
+    "twob:fix-imports": "node scripts/fix-twob-client-imports.mjs",
     "export:android": "expo export --platform android",
     "export:web": "expo export --platform web",
     "format": "prettier --write .",

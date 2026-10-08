@@ -41,7 +41,7 @@ import {
   type ResolvedInstructionAccount,
 } from '@solana/program-client-core'
 import { findFutureIntervalPda } from '../pdas'
-import { TWOB_ANCHOR_PROGRAM_ADDRESS } from '../programs'
+import { TWOB_ANCHOR_PROGRAM_ADDRESS } from '../../../program-address'
 
 export const UNPAUSE_TRADE_POSITION_DISCRIMINATOR: ReadonlyUint8Array =
   new Uint8Array([212, 116, 103, 81, 196, 132, 86, 153])

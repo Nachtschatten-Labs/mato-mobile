@@ -38,7 +38,7 @@ import {
   getAccountMetaFactory,
   type ResolvedInstructionAccount,
 } from '@solana/program-client-core'
-import { TWOB_ANCHOR_PROGRAM_ADDRESS } from '../programs'
+import { TWOB_ANCHOR_PROGRAM_ADDRESS } from '../../../program-address'
 
 export const UPDATE_LIQUIDITY_FLOWS_DISCRIMINATOR: ReadonlyUint8Array =
   new Uint8Array([59, 94, 163, 206, 138, 237, 163, 178])

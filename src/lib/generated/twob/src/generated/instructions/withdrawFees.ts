@@ -39,7 +39,7 @@ import {
   getAddressFromResolvedInstructionAccount,
   type ResolvedInstructionAccount,
 } from '@solana/program-client-core'
-import { TWOB_ANCHOR_PROGRAM_ADDRESS } from '../programs'
+import { TWOB_ANCHOR_PROGRAM_ADDRESS } from '../../../program-address'
 
 export const WITHDRAW_FEES_DISCRIMINATOR: ReadonlyUint8Array = new Uint8Array([
   198, 212, 171, 109, 144, 215, 174, 89,
