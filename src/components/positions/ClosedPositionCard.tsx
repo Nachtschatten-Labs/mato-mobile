@@ -4,12 +4,9 @@ import { ChevronRight } from 'lucide-react-native'
 import { useQuery } from '@tanstack/react-query'
 import { Text } from '../ui'
 import { Drawer } from '../Drawer'
-import {
-  FillSummary,
-  SheetRow,
-  StreamIdentity,
-  TransactionLink,
-} from './Shared'
+import { SheetRow, StreamIdentity, TransactionLink } from './Shared'
+import { FillHistory } from './FillHistory'
+import { getClosedPositionHistoryRange } from './history'
 import {
   fillComparison,
   streamAmount,
@@ -24,6 +21,7 @@ import {
   mobileMarket,
   useForeground,
 } from '../../hooks/usePositions'
+import { usePositionHistory } from '../../hooks/usePositionHistory'
 import { fetchClosedPositionMiniChart } from '../../features/trading/api/market-repository'
 import { buildClosedPositionSummary } from '../../features/trading/view-models/closed-position'
 import { formatAtoms } from '../../features/trading/lib/format'
@@ -62,6 +60,11 @@ export default function ClosedPositionCard({
     (endSlot === null || reportedStart <= endSlot)
       ? reportedStart
       : null
+  const history = usePositionHistory({
+    enabled: expanded,
+    ...getClosedPositionHistoryRange(event),
+    rangeKey: event.signature,
+  })
   const time = useQuery({
     queryKey: [
       ...mobileKeys,
@@ -125,7 +128,8 @@ export default function ClosedPositionCard({
   }
   const early =
     closeSlot !== null && scheduledEnd !== null && closeSlot < scheduledEnd
-  const startPrice = baseline.data?.[0]?.price ?? null
+  const startPrice =
+    history.points[0]?.price ?? baseline.data?.[0]?.price ?? null
   const comparison = fillComparison(
     summary.averageFillPrice,
     startPrice,
@@ -211,10 +215,15 @@ export default function ClosedPositionCard({
             value={`${formatAtoms(summary.feeAtoms, summary.swappedDecimals, summary.swappedDecimals)} ${summary.swappedToken}`}
           />
         </View>
-        <FillSummary
+        <FillHistory
+          points={history.points}
           startPrice={startPrice}
           average={summary.averageFillPrice}
-          progress={100}
+          isLoading={history.isLoading}
+          hasError={history.hasError}
+          onRetry={() => {
+            void history.refetch()
+          }}
         />
         <View style={styles.group}>
           <SheetRow

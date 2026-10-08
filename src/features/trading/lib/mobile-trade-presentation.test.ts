@@ -6,10 +6,27 @@ import {
   nearestDuration,
   tradeDuration,
   tradeFinish,
+  tradePriceImpact,
   tradeTimeLeft,
 } from './mobile-trade-presentation'
 
 describe('mobile stream presentation', () => {
+  it.each([
+    [null, '—'],
+    [0, '<0.001%'],
+    [0.000001, '<0.001%'],
+    [0.000999, '<0.001%'],
+    [0.001, '−0.001%'],
+    [0.012345, '−0.012%'],
+    [0.012678, '−0.013%'],
+    [1, '−1.000%'],
+  ])(
+    'shows price impact %s with three-decimal precision (%s)',
+    (value, label) => {
+      expect(tradePriceImpact(value)).toBe(label)
+    },
+  )
+
   it('keeps grouped inputs and fractional token precision exact', () => {
     expect(groupTradeAmount('123456789012345.00100')).toBe(
       '123,456,789,012,345.00100',

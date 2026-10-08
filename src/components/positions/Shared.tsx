@@ -1,12 +1,11 @@
 import type { ReactNode } from 'react'
 import { Linking, Pressable, StyleSheet, View } from 'react-native'
-import Svg, { Circle, Line } from 'react-native-svg'
+import Svg, { Circle } from 'react-native-svg'
 import { Text } from '../ui'
 import { TokenLogo } from '../TokenLogo'
 import { colors } from '../../theme'
 import { config } from '../../config'
 import { formatExplorerTransactionUrl } from '../../features/trading/lib/format'
-import { streamPrice } from './presentation'
 
 export function Notice({
   children,
@@ -132,78 +131,6 @@ export function TransactionLink({
   )
 }
 
-/** A real start-price reference and the current fill only. Market movements are
- * deliberately not drawn as personal fills: the API has no fill-history series. */
-export function FillSummary({
-  startPrice,
-  average,
-  progress,
-  paused = false,
-  marketPrice,
-}: {
-  startPrice: number | null
-  average: number | null
-  progress: number | null
-  paused?: boolean
-  marketPrice?: number | null
-}) {
-  const low = Math.min(startPrice ?? average ?? 0, average ?? startPrice ?? 0)
-  const high = Math.max(startPrice ?? average ?? 0, average ?? startPrice ?? 0)
-  const span = Math.max(high - low, high * 0.004, 0.00001)
-  const y = (price: number) => 44 - ((price - (high + low) / 2) / span) * 32
-  return (
-    <View style={styles.chart}>
-      <View style={styles.chartHeader}>
-        {marketPrice !== undefined && (
-          <Text style={styles.label}>
-            SOL/USDC{' '}
-            <Text style={styles.chartValue}>{streamPrice(marketPrice)}</Text>
-          </Text>
-        )}
-        <View style={styles.chartKeys}>
-          <Text style={styles.label}>
-            — Started at{' '}
-            <Text style={styles.chartValue}>{streamPrice(startPrice)}</Text>
-          </Text>
-          <Text style={styles.label}>
-            <Text style={{ color: colors.chart }}>—</Text> Avg. fill{' '}
-            <Text style={styles.chartValue}>{streamPrice(average)}</Text>
-          </Text>
-        </View>
-      </View>
-      <View
-        accessible
-        accessibilityLabel={`Started at ${streamPrice(startPrice)}. Average fill ${streamPrice(average)} USDC per SOL. Fill history unavailable.`}
-        style={styles.plot}
-      >
-        <Svg width="100%" height={82} viewBox="0 0 320 82">
-          {startPrice !== null && (
-            <Line
-              x1={4}
-              x2={316}
-              y1={y(startPrice)}
-              y2={y(startPrice)}
-              stroke={colors.grip}
-              strokeWidth={1}
-            />
-          )}
-          {average !== null && (
-            <Circle
-              cx={6 + (Math.min(100, Math.max(0, progress ?? 0)) / 100) * 308}
-              cy={y(average)}
-              r={4}
-              stroke={colors.chart}
-              strokeWidth={1.5}
-              fill={paused ? colors.background : colors.chart}
-            />
-          )}
-        </Svg>
-        <Text style={styles.historyNote}>Fill history unavailable.</Text>
-      </View>
-    </View>
-  )
-}
-
 const styles = StyleSheet.create({
   notice: {
     padding: 14,
@@ -271,21 +198,4 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textDecorationLine: 'underline',
   },
-  chart: {
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: 'hidden',
-    backgroundColor: colors.background,
-  },
-  chartHeader: {
-    padding: 12,
-    gap: 8,
-    borderBottomWidth: 1,
-    borderColor: colors.border,
-  },
-  chartKeys: { flexDirection: 'row', gap: 16, flexWrap: 'wrap' },
-  chartValue: { fontSize: 12, color: colors.text },
-  plot: { paddingHorizontal: 12, paddingBottom: 10 },
-  historyNote: { color: colors.faint, fontSize: 12 },
 })

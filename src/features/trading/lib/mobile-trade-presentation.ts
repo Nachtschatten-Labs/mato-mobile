@@ -73,6 +73,11 @@ export function groupTradeAmount(value: string) {
   return `${whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}${fraction === undefined ? '' : `.${fraction}`}`
 }
 
+export function tradePriceImpact(value: number | null) {
+  if (value === null) return '—'
+  return value < 0.001 ? '<0.001%' : `−${value.toFixed(3)}%`
+}
+
 export function tradeTimeLeft(seconds: number) {
   if (seconds < 60) return `${Math.max(0, Math.ceil(seconds))} sec`
   const minutes = Math.ceil(seconds / 60)
