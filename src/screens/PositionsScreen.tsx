@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
-  Alert,
-  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -14,10 +12,14 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query'
-import { SafeAreaView } from 'react-native-safe-area-context'
 import type { Address } from '@solana/kit'
 import { Text, Button } from '../components/ui'
-import PositionCard, { type PositionAction } from '../components/PositionCard'
+import PositionCard, {
+  type PositionAction,
+  type PendingPositionAction,
+} from '../components/PositionCard'
+import { Drawer } from '../components/Drawer'
+import { useToast } from '../components/Toast'
 import ClosedPositionCard from '../components/positions/ClosedPositionCard'
 import { Detail, Notice, TransactionLink } from '../components/positions/Shared'
 import { assertCloseReview } from '../components/positions/close-review'
@@ -25,6 +27,7 @@ import { colors } from '../theme'
 import { config } from '../config'
 import { rpc } from '../lib/rpc'
 import { useWallet } from '../wallet/WalletProvider'
+import { isWalletCancellation } from '../wallet/errors'
 import {
   mobileKeys,
   mobileMarket,
@@ -53,10 +56,13 @@ type Review = { owner: Address; positions: TradePositionRecord[]; id: number }
 
 export default function PositionsScreen({
   embedded = false,
+  onStart,
 }: {
   embedded?: boolean
+  onStart?: () => void
 }) {
   const wallet = useWallet()
+  const { showToast } = useToast()
   const client = useQueryClient()
   const active = useForeground()
   const market = useNativeMarketState()
@@ -67,7 +73,13 @@ export default function PositionsScreen({
   const [review, setReview] = useState<Review | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [signature, setSignature] = useState<string | null>(null)
-  const [pending, setPending] = useState(false)
+  const [pendingAction, setPendingAction] =
+    useState<PendingPositionAction>(null)
+  const [lastConfirmed, setLastConfirmed] = useState<{
+    address: string
+    signature: string
+  } | null>(null)
+  const pending = pendingAction !== null
   const busy = useRef(false)
   const reviewSequence = useRef(0)
   const currentOwner = useRef(wallet.address)
@@ -77,6 +89,7 @@ export default function PositionsScreen({
     setError(null)
     setSignature(null)
     setActivePage(0)
+    setLastConfirmed(null)
   }, [wallet.address])
   const closed = useInfiniteQuery({
     queryKey: [...mobileKeys, 'closed-positions', wallet.address],
@@ -160,7 +173,7 @@ export default function PositionsScreen({
       return
     }
     busy.current = true
-    setPending(true)
+    setPendingAction({ address: selected[0].address, action })
     setError(null)
     setSignature(null)
     try {
@@ -197,17 +210,52 @@ export default function PositionsScreen({
       else confirmed = await sendWithdrawSwapped({ context, request })
       if (currentOwner.current === owner) {
         setSignature(confirmed)
+        setLastConfirmed({ address: selected[0].address, signature: confirmed })
         setReview(null)
+        showToast({
+          title:
+            action === 'pause'
+              ? 'Stream paused'
+              : action === 'resume'
+                ? 'Stream resumed'
+                : action === 'withdraw'
+                  ? 'Sent to your wallet'
+                  : selected.length === 1
+                    ? 'Stream closed'
+                    : 'Streams closed',
+          description:
+            action === 'pause'
+              ? 'Nothing trades until you resume.'
+              : action === 'resume'
+                ? 'Trading has resumed for the remaining duration.'
+                : action === 'withdraw'
+                  ? "The available funds were sent to the stream's receiver. The stream keeps running."
+                  : "The remaining funds were sent to the streams' receiver accounts.",
+          signature: confirmed,
+          tone: 'success',
+        })
       }
       await client.invalidateQueries({ queryKey: ['mobile'] })
     } catch (cause) {
-      if (currentOwner.current === owner)
-        setError(
-          formatTransactionError(cause, 'The position could not be updated.'),
+      if (currentOwner.current === owner) {
+        const message = formatTransactionError(
+          cause,
+          'The stream could not be updated.',
         )
+        const declined =
+          isWalletCancellation(cause) || message === 'Wallet request cancelled.'
+        setError(declined ? null : message)
+        showToast({
+          title: declined ? 'Request declined' : 'Could not update stream',
+          description: declined
+            ? 'You declined it in your wallet. Nothing changed.'
+            : message,
+          tone: 'error',
+        })
+      }
     } finally {
       busy.current = false
-      setPending(false)
+      setPendingAction(null)
     }
   }
 
@@ -218,27 +266,7 @@ export default function PositionsScreen({
       openReview([position])
       return
     }
-    const title =
-      action === 'withdraw'
-        ? 'Withdraw swapped funds?'
-        : action === 'resume'
-          ? 'Resume this stream?'
-          : 'Pause this stream?'
-    const description =
-      action === 'withdraw'
-        ? 'Claim the amount swapped so far, less the protocol fee. The remaining stream stays open.'
-        : action === 'resume'
-          ? 'Execution will resume for the remaining duration. Review the transaction in your wallet.'
-          : 'Execution stops until you resume. Your remaining input stays in the position.'
-    Alert.alert(title, description, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Continue',
-        onPress: () => {
-          void run(action, [position])
-        },
-      },
-    ])
+    void run(action, [position])
   }
 
   function openReview(selected: TradePositionRecord[]) {
@@ -292,10 +320,13 @@ export default function PositionsScreen({
             onPress={() => setTab(value)}
             style={[styles.tab, tab === value && styles.selectedTab]}
           >
-            <Text style={{ color: tab === value ? colors.text : colors.muted }}>
-              {value === 'active'
-                ? `Active${positions.data?.length ? ` · ${positions.data.length}` : ''}`
-                : 'Closed'}
+            <Text
+              style={{
+                fontSize: 16,
+                color: tab === value ? colors.text : colors.muted,
+              }}
+            >
+              {value === 'active' ? 'Active' : 'Closed'}
             </Text>
           </Pressable>
         ))}
@@ -307,6 +338,7 @@ export default function PositionsScreen({
           </Text>
           <Button
             title={wallet.isConnecting ? 'Connecting…' : 'Connect wallet'}
+            variant="ghost"
             disabled={wallet.isConnecting || !wallet.supported}
             onPress={() => {
               void wallet
@@ -338,11 +370,7 @@ export default function PositionsScreen({
               Network data could not be refreshed. Pull down to retry.
             </Notice>
           )}
-          {pending && (
-            <Notice>
-              Approve the transaction in your wallet. Waiting for confirmation…
-            </Notice>
-          )}
+          {pending && <Notice>Approve and confirm in your wallet.</Notice>}
           {signature && (
             <View>
               <Notice>Transaction confirmed.</Notice>
@@ -378,10 +406,20 @@ export default function PositionsScreen({
                 </Notice>
               ) : positions.data?.length === 0 ? (
                 <View style={styles.empty}>
-                  <Text style={styles.emptyIcon}>≈</Text>
-                  <Text style={styles.emptyTitle}>No active streams</Text>
                   <Text style={styles.subtitle}>
-                    Start a trade and watch it fill over time.
+                    No streams running.{' '}
+                    {onStart ? (
+                      <Text
+                        accessibilityRole="link"
+                        onPress={onStart}
+                        style={styles.startLink}
+                      >
+                        Start one
+                      </Text>
+                    ) : (
+                      'Start one'
+                    )}{' '}
+                    and it shows up here.
                   </Text>
                 </View>
               ) : (
@@ -391,8 +429,14 @@ export default function PositionsScreen({
                     position={position}
                     market={market.data ?? null}
                     disabled={disabled}
-                    pending={pending}
+                    pending={pendingAction}
                     onAction={onAction}
+                    signature={
+                      lastConfirmed?.address === position.address
+                        ? lastConfirmed.signature
+                        : undefined
+                    }
+                    onError={setError}
                   />
                 ))
               )}
@@ -429,9 +473,8 @@ export default function PositionsScreen({
                 </Notice>
               ) : rows.length === 0 && !closed.error ? (
                 <View style={styles.empty}>
-                  <Text style={styles.emptyTitle}>A fresh start</Text>
                   <Text style={styles.subtitle}>
-                    Your completed streams will appear here.
+                    Finished streams show up here with their receipt.
                   </Text>
                 </View>
               ) : (
@@ -471,179 +514,162 @@ export default function PositionsScreen({
         </>
       )}
       {error && <Notice error>{error}</Notice>}
-      <Modal
+      <Drawer
         visible={review !== null}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => {
+        title={
+          review?.positions.length === 1
+            ? 'Close this stream?'
+            : 'Close these streams?'
+        }
+        dismissible={!pending}
+        onClose={() => {
           if (!pending) setReview(null)
         }}
       >
-        <SafeAreaView style={styles.screen}>
-          <ScrollView contentContainerStyle={styles.content}>
-            <Text style={styles.eyebrow}>REVIEW RETURNS</Text>
-            <Text style={styles.title}>
-              Close{' '}
-              {review?.positions.length === 1
-                ? 'this stream?'
-                : 'these streams?'}
-            </Text>
-            <Text style={styles.subtitle}>
-              Your remaining input and swapped output return to the position’s
-              receiver accounts.
-            </Text>
-            {preview.isPending ? (
-              <ActivityIndicator color={colors.accent} style={styles.loader} />
-            ) : preview.error ? (
-              <Notice error>
-                {formatTransactionError(
-                  preview.error,
-                  'Could not simulate this close.',
-                )}
-              </Notice>
-            ) : (
-              preview.data?.map((value, index) => {
-                const position = review?.positions[index]
-                if (!position) return null
-                const buy = isBuyTradePosition(position.data)
-                return (
-                  <View key={position.address} style={styles.reviewCard}>
-                    <Text style={styles.emptyTitle}>
-                      {buy ? 'Buy' : 'Sell'} SOL
-                    </Text>
-                    <Detail
-                      label="Receive on close, after fee"
-                      value={`${formatAtoms(value.receivedAtoms, buy ? 9 : 6)} ${buy ? 'SOL' : 'USDC'}`}
-                    />
-                    <Detail
-                      label="Refunded input"
-                      value={`${formatAtoms(value.remainingDepositAtoms, buy ? 6 : 9)} ${buy ? 'USDC' : 'SOL'}`}
-                    />
-                    <Detail
-                      label="Output fee"
-                      value={`${formatAtoms(value.feeAtoms, buy ? 9 : 6, buy ? 9 : 6)} ${buy ? 'SOL' : 'USDC'}`}
-                    />
-                    <Detail
-                      label="Account rent returned"
-                      value={`${formatAtoms(value.positionRentLamports, 9)} SOL`}
-                    />
-                    <Detail
-                      label="SOL receiver"
-                      value={shortenAddress(value.baseReceiver, 6, 6)}
-                    />
-                    <Detail
-                      label="USDC receiver"
-                      value={shortenAddress(value.quoteReceiver, 6, 6)}
-                    />
-                    <Detail
-                      label="Rent receiver"
-                      value={shortenAddress(value.rentReceiver, 6, 6)}
-                    />
-                  </View>
-                )
-              })
+        <Text style={styles.subtitle}>
+          This ends the stream. It can't be resumed.
+        </Text>
+        {preview.isPending ? (
+          <ActivityIndicator color={colors.accent} style={styles.loader} />
+        ) : preview.error ? (
+          <Notice error>
+            {formatTransactionError(
+              preview.error,
+              'Could not simulate this close.',
             )}
-            <Text style={styles.subtitle}>
-              These are simulated returns. Amounts can change before
-              confirmation. Funds already withdrawn are excluded. Closing ends
-              execution permanently.
-            </Text>
-            {error && <Notice error>{error}</Notice>}
-            <Button
-              title={pending ? 'Confirming…' : 'Close and settle'}
-              disabled={
-                disabled ||
-                preview.isFetching ||
-                !preview.data ||
-                Boolean(preview.error)
-              }
-              onPress={() => {
-                if (review) void run('close', review.positions)
-              }}
-            />
-            <Button
-              title="Refresh preview"
-              variant="secondary"
-              disabled={pending || preview.isFetching}
-              onPress={() => {
-                void preview.refetch()
-              }}
-            />
-            <Button
-              title="Keep streams open"
-              variant="ghost"
-              disabled={pending}
-              onPress={() => setReview(null)}
-            />
-          </ScrollView>
-        </SafeAreaView>
-      </Modal>
+          </Notice>
+        ) : (
+          preview.data?.map((value, index) => {
+            const position = review?.positions[index]
+            if (!position) return null
+            const buy = isBuyTradePosition(position.data)
+            return (
+              <View key={position.address} style={styles.reviewCard}>
+                <Text style={styles.subtitle}>
+                  You'll get back
+                  {review && review.positions.length > 1
+                    ? ` · ${buy ? 'Buy' : 'Sell'} SOL`
+                    : ''}
+                </Text>
+                <Detail
+                  label={`${buy ? 'SOL' : 'USDC'} received`}
+                  value={`${formatAtoms(value.receivedAtoms, buy ? 9 : 6, buy ? 9 : 6)} ${buy ? 'SOL' : 'USDC'}`}
+                />
+                <Detail
+                  label={buy ? 'USDC not spent' : 'SOL not sold'}
+                  value={`${formatAtoms(value.remainingDepositAtoms, buy ? 6 : 9, buy ? 6 : 9)} ${buy ? 'USDC' : 'SOL'}`}
+                />
+                <Detail
+                  label="Output fee"
+                  value={`${formatAtoms(value.feeAtoms, buy ? 9 : 6, buy ? 9 : 6)} ${buy ? 'SOL' : 'USDC'}`}
+                />
+                <Detail
+                  label="Account rent returned"
+                  value={`${formatAtoms(value.positionRentLamports, 9, 9)} SOL`}
+                />
+                <Detail
+                  label="SOL receiver"
+                  value={shortenAddress(value.baseReceiver, 6, 6)}
+                />
+                <Detail
+                  label="USDC receiver"
+                  value={shortenAddress(value.quoteReceiver, 6, 6)}
+                />
+                <Detail
+                  label="Rent receiver"
+                  value={shortenAddress(value.rentReceiver, 6, 6)}
+                />
+              </View>
+            )
+          })
+        )}
+        <Text style={styles.subtitle}>
+          These are simulated returns. Amounts can change before confirmation.
+          Funds already withdrawn are excluded. Closing ends execution
+          permanently.
+        </Text>
+        {error && <Notice error>{error}</Notice>}
+        <Button
+          title={
+            pending ? 'Approve and confirm in your wallet' : 'Close stream'
+          }
+          loading={pending}
+          disabled={
+            disabled ||
+            preview.isFetching ||
+            !preview.data ||
+            Boolean(preview.error)
+          }
+          onPress={() => {
+            if (review) void run('close', review.positions)
+          }}
+        />
+        <Button
+          title="Refresh preview"
+          variant="secondary"
+          disabled={pending || preview.isFetching}
+          onPress={() => {
+            void preview.refetch()
+          }}
+        />
+        <Button
+          title={
+            review?.positions.length === 1
+              ? 'Keep it running'
+              : 'Keep them running'
+          }
+          variant="ghost"
+          disabled={pending}
+          onPress={() => setReview(null)}
+        />
+      </Drawer>
     </Container>
   )
 }
 
 const styles = StyleSheet.create({
   embedded: {
-    gap: 12,
-    padding: 16,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.card,
+    overflow: 'hidden',
   },
   screen: { flex: 1, backgroundColor: colors.background },
   content: {
-    padding: 20,
+    padding: 12,
     paddingBottom: 40,
-    gap: 16,
     maxWidth: 760,
     width: '100%',
     alignSelf: 'center',
   },
-  eyebrow: {
-    fontSize: 10,
-    letterSpacing: 2,
-    color: colors.accent,
-    marginTop: 12,
-  },
-  title: { fontSize: 32, lineHeight: 40, fontWeight: '500', letterSpacing: -1 },
-  subtitle: { color: colors.muted, fontSize: 13, lineHeight: 21 },
-  tabs: {
-    flexDirection: 'row',
-    padding: 4,
-    backgroundColor: colors.card,
-    borderRadius: 30,
-    borderColor: colors.border,
-    borderWidth: 1,
-    marginTop: 8,
-  },
+  subtitle: { color: colors.muted, fontSize: 14, lineHeight: 22 },
+  tabs: { flexDirection: 'row', padding: 12, gap: 4 },
   tab: {
-    flex: 1,
-    minHeight: 42,
+    minHeight: 36,
+    paddingHorizontal: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 24,
+    borderRadius: 20,
   },
   selectedTab: { backgroundColor: colors.elevated },
   empty: {
-    padding: 12,
-    gap: 16,
-    marginVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
+    paddingHorizontal: 18,
+    paddingVertical: 22,
+    borderTopWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.card,
+    alignItems: 'flex-start',
+    gap: 4,
   },
-  emptyIcon: { color: colors.accent, fontSize: 36, lineHeight: 44 },
-  emptyTitle: { fontSize: 18, fontWeight: '500' },
+  startLink: { color: colors.text, textDecorationLine: 'underline' },
   loader: { padding: 30 },
   reviewCard: {
-    backgroundColor: colors.card,
-    padding: 20,
-    borderRadius: 20,
+    backgroundColor: colors.elevated,
+    padding: 16,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.border,
-    gap: 8,
+    gap: 6,
   },
   pagination: {
     flexDirection: 'row',

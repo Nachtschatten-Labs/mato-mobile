@@ -1,12 +1,25 @@
 import { Component, useEffect, useState } from 'react'
 import type { ErrorInfo, PropsWithChildren } from 'react'
-import { AppState, StyleSheet, View } from 'react-native'
+import {
+  ActivityIndicator,
+  AppState,
+  Linking,
+  Pressable,
+  StyleSheet,
+  View,
+} from 'react-native'
 import { StatusBar } from 'expo-status-bar'
 import { useFonts } from 'expo-font'
 import { IBMPlexSans_400Regular } from '@expo-google-fonts/ibm-plex-sans/400Regular'
 import { IBMPlexSans_500Medium } from '@expo-google-fonts/ibm-plex-sans/500Medium'
-import { IBMPlexSans_600SemiBold } from '@expo-google-fonts/ibm-plex-sans/600SemiBold'
-import { IBMPlexMono_400Regular } from '@expo-google-fonts/ibm-plex-mono/400Regular'
+import {
+  ArrowLeft,
+  Check,
+  ChevronDown,
+  Copy,
+  Wallet,
+} from 'lucide-react-native'
+import * as Clipboard from 'expo-clipboard'
 import {
   SafeAreaProvider,
   useSafeAreaInsets,
@@ -32,6 +45,9 @@ import AccountScreen from '@/screens/AccountScreen'
 import { Button, Text } from '@/components/ui'
 import { colors, fonts } from '@/theme'
 import { config } from '@/config'
+import { FirstVisit } from '@/components/FirstVisit'
+import { Drawer } from '@/components/Drawer'
+import { ToastProvider, ToastViewport, useToast } from '@/components/Toast'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -54,6 +70,13 @@ function Header() {
   const navigation = useNavigation<BottomTabNavigationProp<Routes>>()
   const route = useRoute()
   const [online, setOnline] = useState(true)
+  const [walletOpen, setWalletOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const { showToast } = useToast()
+  useEffect(() => {
+    setWalletOpen(false)
+    setCopied(false)
+  }, [wallet.address])
   useEffect(
     () =>
       NetInfo.addEventListener((state) =>
@@ -66,26 +89,73 @@ function Header() {
       <View style={styles.headerRow}>
         <Text style={styles.wordmark}>mato</Text>
         {!online && <Text style={styles.networkText}>Offline</Text>}
-        <Button
-          title={
-            route.name === 'Account'
-              ? 'Back to trading'
-              : wallet.address
-                ? `${wallet.address.slice(0, 4)}…${wallet.address.slice(-4)}`
-                : 'Connect wallet'
-          }
-          onPress={() => {
-            if (route.name === 'Account') navigation.navigate('Trade')
-            else if (wallet.address) navigation.navigate('Account')
-            else void wallet.connect().catch(() => {})
-          }}
-          loading={wallet.isConnecting}
-          variant="secondary"
-          disabled={!wallet.supported && route.name !== 'Account'}
-          style={styles.walletButton}
-        />
+        <View style={styles.headerActions}>
+          <Pressable
+            accessibilityRole="link"
+            onPress={() => {
+              void Linking.openURL(
+                'https://github.com/Nachtschatten-Labs/mato-mobile#readme',
+              ).catch(() =>
+                showToast({
+                  title: 'Could not open Docs',
+                  description: 'Please try again.',
+                  tone: 'error',
+                }),
+              )
+            }}
+            style={styles.docsLink}
+          >
+            <Text style={styles.docs}>Docs</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={
+              route.name === 'Account'
+                ? 'Back to trading'
+                : wallet.address
+                  ? `${wallet.address.slice(0, 4)}…${wallet.address.slice(-4)}`
+                  : 'Connect wallet'
+            }
+            onPress={() => {
+              if (route.name === 'Account') navigation.navigate('Trade')
+              else if (wallet.address) {
+                setCopied(false)
+                setWalletOpen(true)
+              } else void wallet.connect().catch(() => {})
+            }}
+            accessibilityState={{
+              disabled:
+                (!wallet.supported && route.name !== 'Account') ||
+                wallet.isConnecting,
+              busy: wallet.isConnecting,
+            }}
+            disabled={
+              (!wallet.supported && route.name !== 'Account') ||
+              wallet.isConnecting
+            }
+            style={styles.walletButton}
+          >
+            {wallet.isConnecting ? (
+              <ActivityIndicator color={colors.icon} size="small" />
+            ) : route.name === 'Account' ? (
+              <ArrowLeft size={16} color={colors.icon} />
+            ) : (
+              <Wallet size={16} color={colors.icon} />
+            )}
+            <Text style={styles.walletText}>
+              {route.name === 'Account'
+                ? 'Back'
+                : wallet.address
+                  ? `${wallet.address.slice(0, 4)}…${wallet.address.slice(-4)}`
+                  : 'Connect wallet'}
+            </Text>
+            {wallet.address && route.name !== 'Account' && (
+              <ChevronDown size={14} color={colors.icon} />
+            )}
+          </Pressable>
+        </View>
       </View>
-      {!config.transactionsEnabled && (
+      {(!config.transactionsEnabled || !wallet.supported) && (
         <Text style={styles.preview}>
           Read-only preview · Mainnet market data
         </Text>
@@ -95,6 +165,67 @@ function Header() {
           {wallet.error}
         </Text>
       )}
+      <Drawer
+        visible={walletOpen && Boolean(wallet.address)}
+        title="Wallet"
+        onClose={() => setWalletOpen(false)}
+      >
+        <View style={styles.walletIdentity}>
+          <Wallet size={24} color={colors.iconStrong} />
+          <Text selectable style={{ flex: 1 }}>
+            {wallet.address
+              ? `${wallet.address.slice(0, 4)}…${wallet.address.slice(-4)}`
+              : ''}
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={copied ? 'Copied' : 'Copy address'}
+            style={styles.copyButton}
+            onPress={() => {
+              if (!wallet.address) return
+              void Clipboard.setStringAsync(wallet.address)
+                .then(() => setCopied(true))
+                .catch(() =>
+                  showToast({
+                    title: 'Could not copy address',
+                    description: 'Please try again.',
+                    tone: 'error',
+                  }),
+                )
+            }}
+          >
+            {copied ? (
+              <Check size={20} color={colors.positive} />
+            ) : (
+              <Copy size={20} color={colors.icon} />
+            )}
+          </Pressable>
+        </View>
+        <Button
+          title="Balances and account"
+          variant="secondary"
+          onPress={() => {
+            setWalletOpen(false)
+            navigation.navigate('Account')
+          }}
+        />
+        <Button
+          title="Disconnect"
+          variant="ghost"
+          onPress={() => {
+            void wallet
+              .disconnect()
+              .then(() => setWalletOpen(false))
+              .catch(() =>
+                showToast({
+                  title: 'Could not disconnect',
+                  description: 'Please try disconnecting again.',
+                  tone: 'error',
+                }),
+              )
+          }}
+        />
+      </Drawer>
     </View>
   )
 }
@@ -114,16 +245,20 @@ function Navigation() {
         },
       }}
     >
-      <Tab.Navigator
-        tabBar={() => null}
-        screenOptions={{
-          header: () => <Header />,
-          sceneStyle: { backgroundColor: colors.background },
-        }}
-      >
-        <Tab.Screen name="Trade" component={TradeScreen} />
-        <Tab.Screen name="Account" component={AccountScreen} />
-      </Tab.Navigator>
+      <View style={styles.navigation}>
+        <Tab.Navigator
+          tabBar={() => null}
+          screenOptions={{
+            header: () => <Header />,
+            sceneStyle: { backgroundColor: 'transparent' },
+          }}
+        >
+          <Tab.Screen name="Trade" component={TradeScreen} />
+          <Tab.Screen name="Account" component={AccountScreen} />
+        </Tab.Navigator>
+        <ToastViewport />
+        <FirstVisit />
+      </View>
     </NavigationContainer>
   )
 }
@@ -132,8 +267,6 @@ function Runtime() {
   const [fontsLoaded, fontError] = useFonts({
     IBMPlexSans_400Regular,
     IBMPlexSans_500Medium,
-    IBMPlexSans_600SemiBold,
-    IBMPlexMono_400Regular,
   })
   useEffect(() => {
     focusManager.setFocused(AppState.currentState === 'active')
@@ -154,8 +287,10 @@ function Runtime() {
   return (
     <QueryClientProvider client={queryClient}>
       <WalletProvider>
-        <Navigation />
-        <StatusBar style="light" />
+        <ToastProvider>
+          <Navigation />
+          <StatusBar style="light" />
+        </ToastProvider>
       </WalletProvider>
     </QueryClientProvider>
   )
@@ -196,6 +331,7 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
+  navigation: { flex: 1, backgroundColor: colors.background },
   loading: {
     flex: 1,
     backgroundColor: colors.background,
@@ -203,9 +339,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   header: {
-    paddingHorizontal: 16,
-    paddingBottom: 10,
-    backgroundColor: colors.background,
+    paddingHorizontal: 24,
+    paddingBottom: 12,
+    backgroundColor: 'transparent',
   },
   headerRow: {
     flexDirection: 'row',
@@ -214,19 +350,38 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   wordmark: {
-    fontSize: 22,
-    lineHeight: 30,
-    letterSpacing: -0.7,
-    fontFamily: fonts.semibold,
+    fontSize: 18,
+    lineHeight: 24,
+    fontFamily: fonts.regular,
   },
   networkText: {
     color: colors.muted,
-    fontSize: 8,
-    lineHeight: 10,
-    letterSpacing: 1.4,
-    fontFamily: fonts.mono,
+    fontSize: 12,
+    lineHeight: 16,
   },
-  walletButton: { minHeight: 42, paddingHorizontal: 13, paddingVertical: 8 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  walletIdentity: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  copyButton: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  docsLink: { minHeight: 44, justifyContent: 'center' },
+  docs: { fontSize: 14, color: colors.muted },
+  walletButton: {
+    minHeight: 36,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 40,
+    borderWidth: 1,
+    borderColor: colors.controlBorder,
+    backgroundColor: colors.panel,
+  },
+  walletText: { fontSize: 14, lineHeight: 18 },
   preview: { color: colors.muted, fontSize: 11, lineHeight: 16, marginTop: 12 },
   walletError: { color: colors.negative, fontSize: 12, marginTop: 8 },
 })

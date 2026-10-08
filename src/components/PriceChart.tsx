@@ -1,16 +1,23 @@
-import { useState } from 'react'
-import { StyleSheet, View } from 'react-native'
+import { useId, useState } from 'react'
+import { Pressable, StyleSheet, View } from 'react-native'
 import Svg, {
+  Circle,
   Defs,
   LinearGradient,
   Stop,
   Path,
   Line,
   Rect,
+  Text as SvgText,
 } from 'react-native-svg'
 import { Label, Text } from './ui'
-import { colors, fonts } from '@/theme'
+import { colors, depth, fonts } from '@/theme'
 import type { MarketCandle } from '@/features/trading/api/market-repository'
+
+const HEIGHT = 172
+const PLOT_TOP = 8
+const PLOT_BOTTOM = HEIGHT - 28
+const formatPrice = (price: number) => price.toFixed(2)
 
 export function PriceChart({
   candles,
@@ -19,96 +26,271 @@ export function PriceChart({
   candles: MarketCandle[]
   mode?: 'line' | 'candles'
 }) {
-  const [width, setWidth] = useState(300)
-  const height = 180
+  const [width, setWidth] = useState(320)
+  const [inspectedIndex, setInspectedIndex] = useState<number | null>(null)
+  const gradientId = `price-fill-${useId().replace(/:/g, '')}`
   if (candles.length < 2)
     return (
-      <View style={styles.empty}>
-        <Text style={{ color: colors.muted }}>Waiting for market activity</Text>
-        <Label>Price history will appear as trades settle.</Label>
+      <View style={[styles.plot, styles.empty]}>
+        <Text style={styles.emptyTitle}>Waiting for market activity</Text>
+        <Label style={styles.emptyDetail}>
+          Price history will appear as trades settle.
+        </Label>
       </View>
     )
-  const low = Math.min(...candles.map((c) => c.low))
-  const high = Math.max(...candles.map((c) => c.high))
-  const padding = Math.max((high - low) * 0.2, high * 0.0005, 0.00001)
-  const min = low - padding,
-    max = high + padding
-  const x = (i: number) => 4 + (i / (candles.length - 1)) * (width - 8)
+
+  const first = candles[0]
+  const latest = candles[candles.length - 1]
+  const low = Math.min(
+    ...candles.map((c) => (mode === 'line' ? c.close : c.low)),
+  )
+  const high = Math.max(
+    ...candles.map((c) => (mode === 'line' ? c.close : c.high)),
+  )
+  const spread = Math.max(high - low, high * 0.0005, 0.00001)
+  const min = low - spread * 0.17
+  const max = high + spread * 0.22
+  // Leave room for the price scale and the reference chart's four-point offset.
+  const priceLabelWidth = Math.max(54, formatPrice(max).length * 7 + 12)
+  const plotRight = Math.max(40, width - priceLabelWidth - 5)
+  const plotWidth = plotRight - 8
+  const dataWidth = plotWidth * (candles.length / (candles.length + 4))
+  const duration = Math.max(1, latest.time - first.time)
+  const x = (time: number) => 8 + ((time - first.time) / duration) * dataWidth
   const y = (price: number) =>
-    height - 10 - ((price - min) / (max - min)) * (height - 20)
+    PLOT_BOTTOM - ((price - min) / (max - min)) * (PLOT_BOTTOM - PLOT_TOP)
   const path = candles
-    .map((c, i) => `${i ? 'L' : 'M'}${x(i)},${y(c.close)}`)
+    .map((c, i) => `${i ? 'L' : 'M'}${x(c.time)},${y(c.close)}`)
     .join(' ')
-  const candleWidth = Math.max(1, Math.min(7, (width / candles.length) * 0.65))
+  const candleWidth = Math.max(
+    1,
+    Math.min(7, (dataWidth / candles.length) * 0.65),
+  )
+  const rawStep = (max - min) / 3
+  const magnitude = 10 ** Math.floor(Math.log10(rawStep))
+  const tickStep =
+    [1, 2, 5, 10].find((step) => step * magnitude >= rawStep)! * magnitude
+  const priceTicks: number[] = []
+  for (
+    let price = Math.ceil(min / tickStep) * tickStep;
+    price <= max;
+    price += tickStep
+  ) {
+    priceTicks.push(price)
+  }
+  const timeTicks = [0, 0.5, 1].map(
+    (fraction) => first.time + duration * fraction,
+  )
+  const formatTime = (time: number) =>
+    new Date(time * 1000).toLocaleString(
+      undefined,
+      duration > 48 * 60 * 60
+        ? { month: 'short', day: 'numeric' }
+        : { hour: '2-digit', minute: '2-digit', hour12: false },
+    )
+  const inspected =
+    inspectedIndex === null
+      ? null
+      : candles[Math.min(inspectedIndex, candles.length - 1)]
+  const inspectAt = (locationX: number) => {
+    const time = first.time + ((locationX - 8) / dataWidth) * duration
+    let nearest = 0
+    candles.forEach((candle, index) => {
+      if (Math.abs(candle.time - time) < Math.abs(candles[nearest].time - time))
+        nearest = index
+    })
+    setInspectedIndex(nearest)
+  }
+
   return (
-    <View
-      onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+    <Pressable
+      style={styles.plot}
+      onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
+      onLongPress={(event) => inspectAt(event.nativeEvent.locationX)}
+      onPressMove={(event) => {
+        if (inspectedIndex !== null) inspectAt(event.nativeEvent.locationX)
+      }}
+      onPressOut={() => setInspectedIndex(null)}
       accessible
-      accessibilityLabel={`SOL price chart. Range ${low.toFixed(4)} to ${high.toFixed(4)} USDC. Latest ${candles.at(-1)!.close.toFixed(4)} USDC.`}
+      accessibilityLabel={`Price chart. Range ${formatPrice(low)} to ${formatPrice(high)} USDC. Latest ${formatPrice(latest.close)} USDC.`}
+      accessibilityHint="Touch and hold to inspect a price."
     >
-      <Svg width="100%" height={height}>
+      <Svg width="100%" height={HEIGHT} pointerEvents="none">
         <Defs>
-          <LinearGradient id="fill" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor={colors.chart} stopOpacity={0.2} />
+          <LinearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor={colors.chart} stopOpacity={0.22} />
             <Stop offset="1" stopColor={colors.chart} stopOpacity={0} />
           </LinearGradient>
         </Defs>
-        {[0.25, 0.5, 0.75].map((t) => (
+        {timeTicks.map((time) => (
           <Line
-            key={t}
-            x1={0}
-            x2={width}
-            y1={height * t}
-            y2={height * t}
-            stroke="#272421"
-            strokeDasharray="3,6"
+            key={time}
+            x1={x(time)}
+            x2={x(time)}
+            y1={PLOT_TOP}
+            y2={PLOT_BOTTOM}
+            stroke={colors.chartGridVertical}
+          />
+        ))}
+        {priceTicks.map((price) => (
+          <Line
+            key={price}
+            x1={8}
+            x2={plotRight}
+            y1={y(price)}
+            y2={y(price)}
+            stroke={colors.chartGridHorizontal}
           />
         ))}
         {mode === 'line' ? (
           <>
             <Path
-              d={`${path} L${x(candles.length - 1)},${height} L4,${height} Z`}
-              fill="url(#fill)"
+              d={`${path} L${x(latest.time)},${PLOT_BOTTOM} L8,${PLOT_BOTTOM} Z`}
+              fill={`url(#${gradientId})`}
             />
-            <Path d={path} stroke={colors.chart} strokeWidth={2} fill="none" />
+            <Path
+              d={path}
+              stroke={colors.chart}
+              strokeWidth={2}
+              strokeLinejoin="round"
+              fill="none"
+            />
           </>
         ) : (
-          candles.map((c, i) => {
-            const color = c.close >= c.open ? colors.positive : colors.negative
-            return (
-              <ViewlessCandle
-                key={c.time}
-                x={x(i)}
-                high={y(c.high)}
-                low={y(c.low)}
-                open={y(c.open)}
-                close={y(c.close)}
-                width={candleWidth}
-                color={color}
-              />
-            )
-          })
+          candles.map((c) => (
+            <ViewlessCandle
+              key={c.time}
+              x={x(c.time)}
+              high={y(c.high)}
+              low={y(c.low)}
+              open={y(c.open)}
+              close={y(c.close)}
+              width={candleWidth}
+              color={c.close >= c.open ? colors.positive : colors.negative}
+            />
+          ))
+        )}
+        {priceTicks
+          .filter((price) => Math.abs(y(price) - y(latest.close)) > 18)
+          .map((price) => (
+            <SvgText
+              key={price}
+              x={plotRight + 8}
+              y={y(price) + 4}
+              fill={colors.muted}
+              fontSize={12}
+              fontFamily={fonts.regular}
+            >
+              {formatPrice(price)}
+            </SvgText>
+          ))}
+        {timeTicks.map((time, index) => (
+          <SvgText
+            key={time}
+            x={x(time)}
+            y={HEIGHT - 10}
+            textAnchor={index === 0 ? 'start' : index === 2 ? 'end' : 'middle'}
+            fill={colors.muted}
+            fontSize={12}
+            fontFamily={fonts.regular}
+          >
+            {formatTime(time)}
+          </SvgText>
+        ))}
+        <Line
+          x1={8}
+          x2={plotRight}
+          y1={y(latest.close)}
+          y2={y(latest.close)}
+          stroke={colors.chart}
+          strokeWidth={1}
+          strokeDasharray="1,2"
+        />
+        <Rect
+          x={plotRight}
+          y={y(latest.close) - 10}
+          width={priceLabelWidth}
+          height={20}
+          fill={colors.chart}
+        />
+        <SvgText
+          x={plotRight + priceLabelWidth / 2}
+          y={y(latest.close) + 4}
+          textAnchor="middle"
+          fill={colors.text}
+          fontSize={12}
+          fontFamily={fonts.regular}
+        >
+          {formatPrice(latest.close)}
+        </SvgText>
+        {inspected && (
+          <>
+            <Line
+              x1={x(inspected.time)}
+              x2={x(inspected.time)}
+              y1={PLOT_TOP}
+              y2={PLOT_BOTTOM}
+              stroke={colors.faint}
+              strokeDasharray="4,4"
+            />
+            <Line
+              x1={8}
+              x2={plotRight}
+              y1={y(inspected.close)}
+              y2={y(inspected.close)}
+              stroke={colors.faint}
+              strokeDasharray="4,4"
+            />
+            <Circle
+              cx={x(inspected.time)}
+              cy={y(inspected.close)}
+              r={4}
+              fill={colors.chart}
+              stroke={colors.background}
+              strokeWidth={2}
+            />
+            <Rect
+              x={plotRight}
+              y={y(inspected.close) - 10}
+              width={priceLabelWidth}
+              height={20}
+              fill={colors.track}
+            />
+            <SvgText
+              x={plotRight + priceLabelWidth / 2}
+              y={y(inspected.close) + 4}
+              textAnchor="middle"
+              fill={colors.text}
+              fontSize={12}
+              fontFamily={fonts.regular}
+            >
+              {formatPrice(inspected.close)}
+            </SvgText>
+            <Rect
+              x={Math.min(plotRight - 74, Math.max(3, x(inspected.time) - 37))}
+              y={HEIGHT - 25}
+              width={74}
+              height={23}
+              rx={3}
+              fill={colors.track}
+            />
+            <SvgText
+              x={Math.min(plotRight - 37, Math.max(40, x(inspected.time)))}
+              y={HEIGHT - 10}
+              textAnchor="middle"
+              fill={colors.text}
+              fontSize={12}
+              fontFamily={fonts.regular}
+            >
+              {formatTime(inspected.time)}
+            </SvgText>
+          </>
         )}
       </Svg>
-      <View style={styles.axis}>
-        <Label>
-          {new Date(candles[0].time * 1000).toLocaleString(undefined, {
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-          })}
-        </Label>
-        <Label>
-          {new Date(candles.at(-1)!.time * 1000).toLocaleTimeString(undefined, {
-            hour: '2-digit',
-            minute: '2-digit',
-          })}
-        </Label>
-      </View>
-    </View>
+    </Pressable>
   )
 }
+
 function ViewlessCandle({
   x,
   high,
@@ -139,12 +321,21 @@ function ViewlessCandle({
     </>
   )
 }
+
 const styles = StyleSheet.create({
+  plot: {
+    backgroundColor: colors.background,
+    boxShadow: depth.sunk,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
   empty: {
-    height: 200,
+    height: HEIGHT,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 16,
     gap: 8,
   },
-  axis: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
+  emptyTitle: { color: colors.muted, textAlign: 'center' },
+  emptyDetail: { textAlign: 'center' },
 })

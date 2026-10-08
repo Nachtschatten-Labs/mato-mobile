@@ -1,4 +1,4 @@
-import type { PropsWithChildren } from 'react'
+import type { PropsWithChildren, Ref } from 'react'
 import {
   ActivityIndicator,
   Pressable,
@@ -14,7 +14,7 @@ import type {
   ViewProps,
   ViewStyle,
 } from 'react-native'
-import { colors, fonts } from '@/theme'
+import { colors, depth, fonts } from '@/theme'
 
 export function Text({ style, ...props }: TextProps) {
   return <NativeText {...props} style={[styles.text, style]} />
@@ -32,7 +32,7 @@ export function Screen({
   children,
   contentContainerStyle,
   ...props
-}: ScrollViewProps) {
+}: ScrollViewProps & { ref?: Ref<ScrollView> }) {
   return (
     <ScrollView
       {...props}
@@ -73,7 +73,7 @@ export function Button({
         variant === 'primary' && styles.primary,
         variant === 'secondary' && styles.secondary,
         variant === 'danger' && styles.danger,
-        (disabled || loading) && { opacity: 0.45 },
+        disabled && !loading && styles.disabled,
         pressed && { opacity: 0.7 },
         style,
       ]}
@@ -89,6 +89,7 @@ export function Button({
           styles.buttonText,
           variant === 'primary' && { color: colors.background },
           variant === 'danger' && { color: colors.negative },
+          disabled && !loading && { color: colors.muted },
         ]}
       >
         {title}
@@ -131,22 +132,24 @@ const styles = StyleSheet.create({
   text: {
     color: colors.text,
     fontFamily: fonts.regular,
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: 16,
+    lineHeight: 21,
+    fontVariant: ['tabular-nums'],
   },
   label: {
     color: colors.muted,
-    fontSize: 12,
+    fontSize: 14,
     lineHeight: 18,
-    fontFamily: fonts.medium,
+    fontFamily: fonts.regular,
   },
   card: {
     backgroundColor: colors.card,
     borderColor: colors.border,
     borderWidth: 1,
     borderRadius: 20,
-    padding: 18,
+    padding: 20,
     gap: 16,
+    boxShadow: depth.panel,
   },
   row: {
     flexDirection: 'row',
@@ -155,9 +158,9 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   screen: {
-    padding: 12,
+    padding: 16,
     paddingBottom: 32,
-    gap: 16,
+    gap: 20,
     maxWidth: 760,
     width: '100%',
     alignSelf: 'center',
@@ -167,28 +170,39 @@ const styles = StyleSheet.create({
     minHeight: 48,
     paddingHorizontal: 18,
     paddingVertical: 12,
-    borderRadius: 28,
+    borderRadius: 40,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     gap: 8,
   },
-  buttonText: { fontFamily: fonts.medium, textAlign: 'center', fontSize: 14 },
-  primary: { backgroundColor: colors.accent },
+  buttonText: { fontFamily: fonts.medium, textAlign: 'center', fontSize: 16 },
+  primary: { backgroundColor: colors.accent, boxShadow: depth.button },
   secondary: {
     backgroundColor: colors.elevated,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.controlBorder,
+    boxShadow: depth.control,
   },
-  danger: { backgroundColor: '#2d1d1d' },
+  danger: {
+    backgroundColor: colors.elevated,
+    borderWidth: 1,
+    borderColor: colors.controlBorder,
+  },
+  disabled: { backgroundColor: colors.track, boxShadow: depth.control },
   empty: {
     alignItems: 'center',
     paddingVertical: 32,
     paddingHorizontal: 16,
     gap: 12,
   },
-  emptyTitle: { fontSize: 18, fontFamily: fonts.medium },
+  emptyTitle: { fontSize: 18, fontFamily: fonts.regular },
   emptyDetail: { textAlign: 'center', color: colors.muted, maxWidth: 330 },
-  error: { backgroundColor: '#271b1b', borderRadius: 12, padding: 14, gap: 4 },
+  error: {
+    backgroundColor: colors.elevated,
+    borderRadius: 8,
+    padding: 14,
+    gap: 4,
+  },
   divider: { height: 1, backgroundColor: colors.border },
 })
