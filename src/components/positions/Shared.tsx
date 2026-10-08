@@ -1,9 +1,12 @@
-import { Linking, StyleSheet, View } from 'react-native'
-import Svg, { Polyline } from 'react-native-svg'
-import { Text, Button } from '../ui'
+import type { ReactNode } from 'react'
+import { Linking, Pressable, StyleSheet, View } from 'react-native'
+import Svg, { Circle, Line } from 'react-native-svg'
+import { Text } from '../ui'
+import { TokenLogo } from '../TokenLogo'
 import { colors } from '../../theme'
 import { config } from '../../config'
 import { formatExplorerTransactionUrl } from '../../features/trading/lib/format'
+import { streamPrice } from './presentation'
 
 export function Notice({
   children,
@@ -35,6 +38,78 @@ export function Detail({ label, value }: { label: string; value: string }) {
   )
 }
 
+export function StreamIdentity({ side }: { side: 'Buy' | 'Sell' }) {
+  return (
+    <View style={styles.identity}>
+      <TokenLogo symbol="SOL" size={20} />
+      <Text style={styles.asset}>SOL</Text>
+      <Text style={styles.side}>{side}</Text>
+    </View>
+  )
+}
+
+export function ProgressRing({ progress }: { progress: number | null }) {
+  const value = Math.min(100, Math.max(0, progress ?? 0))
+  return (
+    <View
+      accessibilityRole="progressbar"
+      accessibilityLabel="Stream filled"
+      accessibilityValue={
+        progress === null
+          ? { text: 'Updating fill' }
+          : { min: 0, max: 100, now: value }
+      }
+    >
+      <Svg width={28} height={28} viewBox="0 0 24 24">
+        <Circle
+          cx={12}
+          cy={12}
+          r={10}
+          stroke={colors.track}
+          strokeWidth={3}
+          fill="none"
+        />
+        <Circle
+          cx={12}
+          cy={12}
+          r={10}
+          stroke={colors.chart}
+          strokeWidth={3}
+          fill="none"
+          strokeLinecap="round"
+          strokeDasharray={`${(value / 100) * 62.83} 62.83`}
+          transform="rotate(-90 12 12)"
+        />
+      </Svg>
+    </View>
+  )
+}
+
+export function SheetRow({
+  label,
+  value,
+  sub,
+  children,
+}: {
+  label: string
+  value: string
+  sub?: string
+  children?: ReactNode
+}) {
+  return (
+    <View style={styles.sheetRow}>
+      <Text style={styles.sheetLabel}>{label}</Text>
+      <View style={styles.sheetValue}>
+        <Text selectable style={styles.sheetAmount}>
+          {value}
+        </Text>
+        {sub && <Text style={styles.sheetSub}>{sub}</Text>}
+        {children}
+      </View>
+    </View>
+  )
+}
+
 export function TransactionLink({
   signature,
   onError,
@@ -43,50 +118,88 @@ export function TransactionLink({
   onError: (message: string) => void
 }) {
   return (
-    <Button
-      title="View transaction ↗"
-      variant="ghost"
+    <Pressable
+      accessibilityRole="link"
       onPress={() => {
         void Linking.openURL(
           formatExplorerTransactionUrl(signature, config.rpcUrl),
         ).catch(() => onError('Could not open Solana Explorer.'))
       }}
-    />
+      style={styles.transaction}
+    >
+      <Text style={styles.transactionText}>View tx</Text>
+    </Pressable>
   )
 }
 
-export function Sparkline({
-  points,
+/** A real start-price reference and the current fill only. Market movements are
+ * deliberately not drawn as personal fills: the API has no fill-history series. */
+export function FillSummary({
+  startPrice,
+  average,
+  progress,
+  paused = false,
+  marketPrice,
 }: {
-  points: readonly { slot: number; price: number }[]
+  startPrice: number | null
+  average: number | null
+  progress: number | null
+  paused?: boolean
+  marketPrice?: number | null
 }) {
-  if (points.length < 2)
-    return <Text style={styles.label}>Price history unavailable.</Text>
-  const low = Math.min(...points.map((point) => point.price))
-  const high = Math.max(...points.map((point) => point.price))
-  const firstSlot = points[0].slot
-  const slotSpan = Math.max(1, points[points.length - 1].slot - firstSlot)
-  const span = high - low || Math.max(high * 0.01, 0.00001)
-  const path = points
-    .map(
-      (point) =>
-        `${8 + ((point.slot - firstSlot) / slotSpan) * 304},${82 - ((point.price - low) / span) * 64}`,
-    )
-    .join(' ')
+  const low = Math.min(startPrice ?? average ?? 0, average ?? startPrice ?? 0)
+  const high = Math.max(startPrice ?? average ?? 0, average ?? startPrice ?? 0)
+  const span = Math.max(high - low, high * 0.004, 0.00001)
+  const y = (price: number) => 44 - ((price - (high + low) / 2) / span) * 32
   return (
-    <View
-      accessible
-      accessibilityLabel={`Historical price chart. Low ${low.toFixed(4)}, high ${high.toFixed(4)} USDC per SOL.`}
-      style={{ height: 96, width: '100%' }}
-    >
-      <Svg width="100%" height="96" viewBox="0 0 320 96">
-        <Polyline
-          points={path}
-          fill="none"
-          stroke={colors.chart}
-          strokeWidth="2"
-        />
-      </Svg>
+    <View style={styles.chart}>
+      <View style={styles.chartHeader}>
+        {marketPrice !== undefined && (
+          <Text style={styles.label}>
+            SOL/USDC{' '}
+            <Text style={styles.chartValue}>{streamPrice(marketPrice)}</Text>
+          </Text>
+        )}
+        <View style={styles.chartKeys}>
+          <Text style={styles.label}>
+            — Started at{' '}
+            <Text style={styles.chartValue}>{streamPrice(startPrice)}</Text>
+          </Text>
+          <Text style={styles.label}>
+            <Text style={{ color: colors.chart }}>—</Text> Avg. fill{' '}
+            <Text style={styles.chartValue}>{streamPrice(average)}</Text>
+          </Text>
+        </View>
+      </View>
+      <View
+        accessible
+        accessibilityLabel={`Started at ${streamPrice(startPrice)}. Average fill ${streamPrice(average)} USDC per SOL. Fill history unavailable.`}
+        style={styles.plot}
+      >
+        <Svg width="100%" height={82} viewBox="0 0 320 82">
+          {startPrice !== null && (
+            <Line
+              x1={4}
+              x2={316}
+              y1={y(startPrice)}
+              y2={y(startPrice)}
+              stroke={colors.grip}
+              strokeWidth={1}
+            />
+          )}
+          {average !== null && (
+            <Circle
+              cx={6 + (Math.min(100, Math.max(0, progress ?? 0)) / 100) * 308}
+              cy={y(average)}
+              r={4}
+              stroke={colors.chart}
+              strokeWidth={1.5}
+              fill={paused ? colors.background : colors.chart}
+            />
+          )}
+        </Svg>
+        <Text style={styles.historyNote}>Fill history unavailable.</Text>
+      </View>
     </View>
   )
 }
@@ -94,10 +207,11 @@ export function Sparkline({
 const styles = StyleSheet.create({
   notice: {
     padding: 14,
-    borderRadius: 14,
+    borderRadius: 8,
     backgroundColor: colors.elevated,
     borderWidth: 1,
     borderColor: colors.border,
+    marginVertical: 8,
   },
   error: { borderColor: colors.negative },
   message: { fontSize: 13, lineHeight: 20, color: colors.muted },
@@ -117,4 +231,61 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     fontVariant: ['tabular-nums'],
   },
+  identity: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  asset: { fontSize: 16 },
+  side: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: colors.secondary,
+    backgroundColor: colors.track,
+    borderRadius: 3,
+    paddingHorizontal: 6,
+  },
+  sheetRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 16,
+    paddingVertical: 10,
+  },
+  sheetLabel: {
+    color: colors.muted,
+    fontSize: 15,
+    paddingTop: 1,
+    flexShrink: 1,
+  },
+  sheetValue: { alignItems: 'flex-end', gap: 4, flexShrink: 1 },
+  sheetAmount: {
+    fontSize: 15,
+    textAlign: 'right',
+    fontVariant: ['tabular-nums'],
+  },
+  sheetSub: { fontSize: 14, color: colors.muted, textAlign: 'right' },
+  transaction: {
+    alignSelf: 'flex-start',
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  transactionText: {
+    color: colors.muted,
+    fontSize: 14,
+    textDecorationLine: 'underline',
+  },
+  chart: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+    backgroundColor: colors.background,
+  },
+  chartHeader: {
+    padding: 12,
+    gap: 8,
+    borderBottomWidth: 1,
+    borderColor: colors.border,
+  },
+  chartKeys: { flexDirection: 'row', gap: 16, flexWrap: 'wrap' },
+  chartValue: { fontSize: 12, color: colors.text },
+  plot: { paddingHorizontal: 12, paddingBottom: 10 },
+  historyNote: { color: colors.faint, fontSize: 12 },
 })

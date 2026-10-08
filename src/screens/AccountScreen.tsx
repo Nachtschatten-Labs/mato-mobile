@@ -11,8 +11,11 @@ import {
 import * as Clipboard from 'expo-clipboard'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Text, Button } from '../components/ui'
+import { TokenLogo } from '../components/TokenLogo'
+import { Wallet } from 'lucide-react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Detail, Notice, TransactionLink } from '../components/positions/Shared'
-import { colors } from '../theme'
+import { colors, fonts } from '../theme'
 import { config } from '../config'
 import { rpc } from '../lib/rpc'
 import { useWallet } from '../wallet/WalletProvider'
@@ -39,6 +42,7 @@ import {
 
 export default function AccountScreen() {
   const wallet = useWallet()
+  const insets = useSafeAreaInsets()
   const client = useQueryClient()
   const active = useForeground()
   const balances = useNativeBalances(wallet.address)
@@ -150,7 +154,10 @@ export default function AccountScreen() {
   return (
     <ScrollView
       style={styles.screen}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[
+        styles.content,
+        { paddingBottom: Math.max(insets.bottom, 24) },
+      ]}
       refreshControl={
         <RefreshControl
           tintColor={colors.accent}
@@ -164,9 +171,7 @@ export default function AccountScreen() {
       <Text style={styles.title}>Account</Text>
       <View style={styles.card}>
         <View style={styles.walletMark}>
-          <Text style={{ fontSize: 30, lineHeight: 36, color: colors.accent }}>
-            ◈
-          </Text>
+          <Wallet size={28} color={colors.iconStrong} />
         </View>
         {wallet.address ? (
           <>
@@ -179,7 +184,7 @@ export default function AccountScreen() {
             <View style={styles.row}>
               <View style={styles.half}>
                 <Button
-                  title={copied ? 'Address copied' : 'Copy address'}
+                  title={copied ? 'Copied' : 'Copy address'}
                   variant="secondary"
                   onPress={() => {
                     void copyAddress()
@@ -238,9 +243,7 @@ export default function AccountScreen() {
             ) : (
               <>
                 <View style={styles.balanceRow}>
-                  <View style={styles.coin}>
-                    <Text>◎</Text>
-                  </View>
+                  <TokenLogo symbol="SOL" size={32} />
                   <View style={styles.half}>
                     <Text style={styles.asset}>Solana</Text>
                     <Text style={styles.small}>SOL</Text>
@@ -250,9 +253,7 @@ export default function AccountScreen() {
                   </Text>
                 </View>
                 <View style={styles.balanceRow}>
-                  <View style={[styles.coin, { backgroundColor: '#2775ca' }]}>
-                    <Text>$</Text>
-                  </View>
+                  <TokenLogo symbol="USDC" size={32} />
                   <View style={styles.half}>
                     <Text style={styles.asset}>USD Coin</Text>
                     <Text style={styles.small}>USDC</Text>
@@ -400,7 +401,7 @@ export default function AccountScreen() {
         </>
       )}
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>About Mato</Text>
+        <Text style={styles.sectionTitle}>About mato</Text>
         <Detail label="Network" value="Solana mainnet" />
         <Detail label="Market" value="SOL / USDC" />
         <Detail
@@ -409,7 +410,7 @@ export default function AccountScreen() {
         />
         <Detail label="Wallet protocol" value="Solana Mobile Wallet Adapter" />
         <Text style={styles.small}>
-          Continuous clearing auctions. Orders stream over time, with execution
+          Continuous clearing auctions. Trades stream over time, with execution
           depending on opposing liquidity.
         </Text>
         <Button
@@ -420,7 +421,7 @@ export default function AccountScreen() {
       </View>
       {wallet.address && (
         <Button
-          title="Disconnect wallet"
+          title="Disconnect"
           variant="danger"
           disabled={pending}
           onPress={() => {
@@ -442,9 +443,9 @@ export default function AccountScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   content: {
-    padding: 20,
+    padding: 16,
     paddingBottom: 40,
-    gap: 16,
+    gap: 20,
     maxWidth: 760,
     width: '100%',
     alignSelf: 'center',
@@ -455,9 +456,9 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     marginTop: 12,
   },
-  title: { fontSize: 32, lineHeight: 40, fontWeight: '500', letterSpacing: -1 },
-  subtitle: { fontSize: 13, color: colors.muted, lineHeight: 21 },
-  small: { fontSize: 11, color: colors.muted, lineHeight: 18 },
+  title: { fontSize: 20, lineHeight: 26, fontFamily: fonts.regular },
+  subtitle: { fontSize: 14, color: colors.muted, lineHeight: 21 },
+  small: { fontSize: 14, color: colors.muted, lineHeight: 19 },
   card: {
     padding: 20,
     gap: 16,
@@ -480,7 +481,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
     fontVariant: ['tabular-nums'],
   },
-  sectionTitle: { fontSize: 18, fontWeight: '500' },
+  sectionTitle: { fontSize: 18, fontFamily: fonts.regular },
   row: { flexDirection: 'row', gap: 8 },
   half: { flex: 1 },
   balanceRow: {
@@ -489,15 +490,7 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 5,
   },
-  coin: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#282331',
-  },
-  asset: { fontSize: 14, fontWeight: '500' },
+  asset: { fontSize: 16, fontFamily: fonts.regular },
   balance: { fontSize: 20, fontVariant: ['tabular-nums'] },
   rentAmount: {
     fontSize: 28,

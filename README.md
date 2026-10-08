@@ -1,6 +1,6 @@
 # mato mobile
 
-Native Android client for the `mato-ui` **v1** SOL/USDC streaming exchange. Built with Expo 57, React Native 0.86, Solana Kit 6, and Solana Mobile Wallet Adapter. The v1 dark theme, IBM Plex typography, verified mainnet market, generated program client, and settlement arithmetic are retained.
+Native Android client for the `mato-ui` **v1** SOL/USDC streaming exchange. Built with Expo 57, React Native 0.86, Solana Kit 6, and Solana Mobile Wallet Adapter. The phone interface follows the `mato-design` handover, with its dark surfaces, IBM Plex Sans typography, orange charts, compact stream lists, and bottom sheets. The verified mainnet market, generated program client, and settlement arithmetic are retained.
 
 ## Run
 
@@ -37,11 +37,13 @@ pnpm mainnet:verify      # read-only backend/cluster health check
 ## Included
 
 - Trade: live SOL/USDC price, line/candle charts, 1H/1D/1W ranges, order book and side filter.
-- Orders: buy/sell, exact atom amounts, available-balance shortcuts, Smart fill, 5-second to 1-year durations, indicative price/impact and a frozen review before wallet approval.
+- Streams: buy/sell, grouped inputs with exact atom amounts, 25/50/75/Max balance shortcuts, automatic duration, a Customize sheet with a live-liquidity impact curve, 5-second to 1-year durations, expandable rate/impact details, and a frozen review before wallet approval.
 - Positions: active streams, authoritative fill/refund accounting, pause/resume, withdrawal, simulated settlement review, and batch closing up to two ended streams.
-- History: pagination, fees, refunds, net receipts, explorer links, drawer price charts and actual/explicitly estimated dates.
-- Account (open from the connected wallet button): balances, address copy, disconnect, interval-account inventory, and reclaiming eligible rent in batches of ten.
+- History: pagination, fees, refunds, net receipts, explorer links, start/average fill summaries and actual/explicitly estimated dates.
+- Wallet: address copy and disconnect in a sheet; Balances and account opens balances, interval-account inventory, and reclaiming eligible rent in batches of ten.
 - Native behavior: a single order-first trading page, Active/Closed position drawers, safe areas, keyboard-aware forms, accessible controls, pull-to-refresh, foreground/focused-screen polling, reconnect handling and visible request errors.
+
+The handover's simulated NVDAx market is adapted to the supported SOL/USDC market. Limit prices are not shown because the current program has no limit-price parameter. Customize uses real market liquidity and retains the existing duration recommendation; it does not invent the prototype's 30-day movement counts or fee quote. Personal fill-history data is unavailable, so stream sheets show the known starting market price and average fill, with an explicit history-unavailable label. Wallet actions retain a combined approval/confirmation state because the native adapter does not expose separate UI phases. Transaction toasts link to the real signature.
 
 ## Mainnet configuration
 

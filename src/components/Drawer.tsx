@@ -1,8 +1,10 @@
-import type { PropsWithChildren } from 'react'
+import type { PropsWithChildren, ReactNode } from 'react'
 import { useMemo } from 'react'
 import {
+  KeyboardAvoidingView,
   Modal,
   PanResponder,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,68 +13,95 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { X } from 'lucide-react-native'
 import { Text } from './ui'
-import { colors, fonts } from '../theme'
+import { ToastViewport } from './Toast'
+import { colors, depth, fonts } from '../theme'
 
-/** A bottom drawer with a scrollable body and native back/escape dismissal. */
+/** Phone sheet with a keyboard-safe scroll area and accessible dismissal. */
 export function Drawer({
   visible,
-  title,
+  title = '',
+  header,
   onClose,
+  dismissible = true,
   children,
 }: PropsWithChildren<{
   visible: boolean
-  title: string
+  title?: string
+  header?: ReactNode
   onClose: () => void
+  dismissible?: boolean
 }>) {
   const insets = useSafeAreaInsets()
   const gesture = useMemo(
     () =>
       PanResponder.create({
         onMoveShouldSetPanResponder: (_, { dx, dy }) =>
-          dy > 8 && dy > Math.abs(dx),
+          dismissible && dy > 8 && dy > Math.abs(dx),
         onPanResponderRelease: (_, { dy, vy }) => {
-          if (dy > 50 || (dy > 12 && vy > 0.5)) onClose()
+          if (dismissible && (dy > 50 || (dy > 12 && vy > 0.5))) onClose()
         },
       }),
-    [onClose],
+    [dismissible, onClose],
   )
+  const dismiss = () => {
+    if (dismissible) onClose()
+  }
   return (
     <Modal
       visible={visible}
       transparent
       animationType="slide"
-      onRequestClose={onClose}
+      onRequestClose={dismiss}
+      statusBarTranslucent
     >
-      <View style={[styles.overlay, { paddingTop: insets.top + 24 }]}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={[styles.overlay, { paddingTop: insets.top + 24 }]}
+      >
         <Pressable
           style={StyleSheet.absoluteFill}
           accessibilityRole="button"
-          accessibilityLabel="Dismiss position details"
-          onPress={onClose}
+          accessibilityLabel="Dismiss sheet"
+          disabled={!dismissible}
+          onPress={dismiss}
         />
         <View
           style={styles.sheet}
           accessibilityViewIsModal
-          onAccessibilityEscape={onClose}
+          onAccessibilityEscape={dismiss}
         >
-          <View style={styles.handleArea} {...gesture.panHandlers}>
-            <View style={styles.handle} />
-          </View>
-          <View style={styles.header}>
-            <Text accessibilityRole="header" style={styles.title}>
-              {title}
-            </Text>
+          <View {...gesture.panHandlers}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Close position details"
-              onPress={onClose}
-              style={styles.close}
+              accessibilityLabel="Close sheet"
+              disabled={!dismissible}
+              onPress={dismiss}
+              style={styles.handleArea}
             >
-              <X size={20} color={colors.muted} />
+              <View style={styles.handle} />
             </Pressable>
+          </View>
+          <View style={styles.header}>
+            {header ?? (
+              <Text accessibilityRole="header" style={styles.title}>
+                {title}
+              </Text>
+            )}
+            {dismissible && (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Close sheet"
+                onPress={dismiss}
+                style={styles.close}
+              >
+                <X size={20} color={colors.icon} />
+              </Pressable>
+            )}
           </View>
           <ScrollView
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            showsVerticalScrollIndicator={false}
             contentContainerStyle={[
               styles.content,
               { paddingBottom: Math.max(insets.bottom, 20) },
@@ -81,11 +110,11 @@ export function Drawer({
             {children}
           </ScrollView>
         </View>
-      </View>
+        <ToastViewport />
+      </KeyboardAvoidingView>
     </Modal>
   )
 }
-
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
@@ -94,18 +123,24 @@ const styles = StyleSheet.create({
   },
   sheet: {
     maxHeight: '100%',
-    backgroundColor: colors.card,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    backgroundColor: colors.panel,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     borderWidth: 1,
     borderColor: colors.border,
     width: '100%',
-    maxWidth: 760,
+    maxWidth: 600,
     alignSelf: 'center',
     overflow: 'hidden',
+    boxShadow: depth.sheet,
   },
   handleArea: { height: 28, alignItems: 'center', justifyContent: 'center' },
-  handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: '#555550' },
+  handle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.grip,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -113,13 +148,14 @@ const styles = StyleSheet.create({
     paddingLeft: 20,
     paddingRight: 8,
     paddingBottom: 8,
+    gap: 12,
   },
-  title: { fontSize: 20, fontFamily: fonts.medium, flex: 1 },
+  title: { fontSize: 18, lineHeight: 24, fontFamily: fonts.regular, flex: 1 },
   close: {
     width: 44,
     height: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  content: { paddingHorizontal: 20, gap: 16 },
+  content: { paddingHorizontal: 20, gap: 20 },
 })
