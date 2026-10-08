@@ -45,6 +45,7 @@ import {
   editTradeAmount,
   tradeDuration,
   tradeFinish,
+  tradePriceImpact,
   tradeTimeLeft,
 } from '@/features/trading/lib/mobile-trade-presentation'
 import { colors, fonts } from '@/theme'
@@ -729,7 +730,7 @@ export default function TradeScreen() {
                       isHighPriceImpact(impact) && { color: colors.negative },
                     ]}
                   >
-                    {impactLabel(impact)}
+                    {tradePriceImpact(impact)}
                   </Text>
                   <ChevronDown
                     size={14}
@@ -768,7 +769,7 @@ export default function TradeScreen() {
                         isHighPriceImpact(impact) && { color: colors.negative },
                       ]}
                     >
-                      {impactLabel(impact)}
+                      {tradePriceImpact(impact)}
                       {impactDollars !== null
                         ? ` · ≈$${decimal(impactDollars, 2)}`
                         : ''}
@@ -974,7 +975,7 @@ export default function TradeScreen() {
               isHighPriceImpact(draftImpact) && { color: colors.negative },
             ]}
           >
-            {impactLabel(draftImpact)} impact
+            {tradePriceImpact(draftImpact)} impact
           </Text>
         </Row>
         {draftImpact !== null ? (
@@ -1022,7 +1023,7 @@ export default function TradeScreen() {
                 ? '—'
                 : decimal(draftReceive, isBuy ? 3 : 2)}{' '}
               {outputToken}{' '}
-              <Text style={s.rate}>({impactLabel(draftImpact)})</Text>
+              <Text style={s.rate}>({tradePriceImpact(draftImpact)})</Text>
             </Text>
           </Row>
         </View>
@@ -1145,7 +1146,7 @@ export default function TradeScreen() {
                   : colors.text,
               }}
             >
-              {impactLabel(orderReview?.impact ?? null)}
+              {tradePriceImpact(orderReview?.impact ?? null)}
             </Text>
           </Row>
         </View>
@@ -1201,9 +1202,6 @@ function decimal(value: number, digits: number) {
 function displayAtoms(value: bigint, decimals: number, digits: number) {
   const [whole, fraction = ''] = formatAtoms(value, decimals, digits).split('.')
   return groupTradeAmount(`${whole}.${fraction.padEnd(digits, '0')}`)
-}
-function impactLabel(value: number | null) {
-  return value === null ? '—' : `−${value.toFixed(2)}%`
 }
 function signedChange(value: number | null) {
   return value === null

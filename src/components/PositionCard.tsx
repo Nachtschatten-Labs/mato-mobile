@@ -6,12 +6,13 @@ import { Text, Button } from './ui'
 import { Drawer } from './Drawer'
 import {
   Detail,
-  FillSummary,
   ProgressRing,
   SheetRow,
   StreamIdentity,
   TransactionLink,
 } from './positions/Shared'
+import { FillHistory } from './positions/FillHistory'
+import { getActivePositionHistoryRange } from './positions/history'
 import {
   fillComparison,
   streamAmount,
@@ -21,6 +22,7 @@ import {
 import { colors } from '../theme'
 import { rpc } from '../lib/rpc'
 import { mobileKeys, mobileMarket, useForeground } from '../hooks/usePositions'
+import { usePositionHistory } from '../hooks/usePositionHistory'
 import { fetchEndSlotBookkeepingSnapshot } from '../features/trading/api/twob-client'
 import { fetchClosedPositionMiniChart } from '../features/trading/api/market-repository'
 import { getActivePositionMetrics } from '../features/trading/lib/position-progress'
@@ -113,7 +115,16 @@ export default function PositionCard({
     staleTime: 5 * 60_000,
     retry: 1,
   })
-  const startPrice = startPriceQuery.data?.[0]?.price ?? null
+  const history = usePositionHistory({
+    enabled: expanded,
+    ...getActivePositionHistoryRange(
+      position.data,
+      market?.currentSlot ?? null,
+    ),
+    rangeKey: position.address,
+  })
+  const startPrice =
+    history.points[0]?.price ?? startPriceQuery.data?.[0]?.price ?? null
   const buy = isBuyTradePosition(position.data)
   const remainingSlots = metrics.isPaused
     ? position.data.remainingSlots
@@ -250,12 +261,17 @@ export default function PositionCard({
             }
           />
         </View>
-        <FillSummary
+        <FillHistory
+          points={history.points}
           startPrice={startPrice}
           average={metrics.averagePrice}
-          progress={metrics.progressPercent}
           paused={metrics.isPaused}
           marketPrice={marketPrice}
+          isLoading={history.isLoading || (expanded && market === null)}
+          hasError={history.hasError}
+          onRetry={() => {
+            void history.refetch()
+          }}
         />
         {ended && (
           <Text style={styles.meta}>
