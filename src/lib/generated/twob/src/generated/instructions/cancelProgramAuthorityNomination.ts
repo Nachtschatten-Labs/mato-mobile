@@ -35,7 +35,7 @@ import {
   getAccountMetaFactory,
   type ResolvedInstructionAccount,
 } from '@solana/program-client-core'
-import { TWOB_ANCHOR_PROGRAM_ADDRESS } from '../programs'
+import { TWOB_ANCHOR_PROGRAM_ADDRESS } from '../../../program-address'
 
 export const CANCEL_PROGRAM_AUTHORITY_NOMINATION_DISCRIMINATOR: ReadonlyUint8Array =
   new Uint8Array([239, 32, 97, 130, 58, 193, 233, 90])

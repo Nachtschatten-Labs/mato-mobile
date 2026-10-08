@@ -41,7 +41,7 @@ import {
   getAddressFromResolvedInstructionAccount,
   type ResolvedInstructionAccount,
 } from '@solana/program-client-core'
-import { TWOB_ANCHOR_PROGRAM_ADDRESS } from '../programs'
+import { TWOB_ANCHOR_PROGRAM_ADDRESS } from '../../../program-address'
 
 export const COMPENSATE_DEBT_DISCRIMINATOR: ReadonlyUint8Array = new Uint8Array(
   [179, 164, 115, 50, 11, 123, 101, 15],

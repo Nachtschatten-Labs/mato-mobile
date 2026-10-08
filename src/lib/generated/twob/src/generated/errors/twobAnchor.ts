@@ -12,7 +12,7 @@ import {
   type SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM,
   type SolanaError,
 } from '@solana/kit'
-import { TWOB_ANCHOR_PROGRAM_ADDRESS } from '../programs'
+import { TWOB_ANCHOR_PROGRAM_ADDRESS } from '../../../program-address'
 
 /** DurationTooShort: Duration is too short */
 export const TWOB_ANCHOR_ERROR__DURATION_TOO_SHORT = 0x1770 // 6000

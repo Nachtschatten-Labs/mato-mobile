@@ -37,7 +37,7 @@ import {
   getAccountMetaFactory,
   type ResolvedInstructionAccount,
 } from '@solana/program-client-core'
-import { TWOB_ANCHOR_PROGRAM_ADDRESS } from '../programs'
+import { TWOB_ANCHOR_PROGRAM_ADDRESS } from '../../../program-address'
 
 export const SET_DEDICATED_MARKET_PAUSED_DISCRIMINATOR: ReadonlyUint8Array =
   new Uint8Array([188, 103, 21, 165, 130, 208, 191, 74])

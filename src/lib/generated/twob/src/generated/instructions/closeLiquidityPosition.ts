@@ -41,7 +41,7 @@ import {
   getAddressFromResolvedInstructionAccount,
   type ResolvedInstructionAccount,
 } from '@solana/program-client-core'
-import { TWOB_ANCHOR_PROGRAM_ADDRESS } from '../programs'
+import { TWOB_ANCHOR_PROGRAM_ADDRESS } from '../../../program-address'
 
 export const CLOSE_LIQUIDITY_POSITION_DISCRIMINATOR: ReadonlyUint8Array =
   new Uint8Array([34, 168, 107, 163, 194, 68, 131, 24])
