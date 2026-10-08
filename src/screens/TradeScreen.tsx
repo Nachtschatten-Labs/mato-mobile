@@ -40,6 +40,7 @@ import { useToast } from '@/components/Toast'
 import { isWalletCancellation } from '@/wallet/errors'
 import { PairLogo, TokenLogo } from '@/components/TokenLogo'
 import { TradeDurationCurve } from '@/components/TradeDurationCurve'
+import { AmountSlider } from '@/components/AmountSlider'
 import {
   groupTradeAmount,
   editTradeAmount,
@@ -76,6 +77,7 @@ import {
   durationToSlots,
   formatAtomsToInput,
   parseTokenAmount,
+  toSliderPercent,
 } from '@/features/trading/lib/amounts'
 import { recommendDurationSlots } from '@/features/trading/lib/duration'
 import {
@@ -195,6 +197,8 @@ export default function TradeScreen() {
       : balances.data.spendableSolAtoms
     : null
   const atoms = amount ? parseTokenAmount(amount, decimals) : null
+  const amountPrecision = 10n ** BigInt(decimals - (isBuy ? 2 : 3))
+  const maximumAmount = amountAtPercent(100)
   const state = stateQuery.data
   const recommended = recommendDurationSlots({
     amountAtoms: atoms,
@@ -269,6 +273,31 @@ export default function TradeScreen() {
     setSmart(true)
     setDurationInfo(false)
     setAmount('')
+    setError(null)
+  }
+  function amountAtPercent(percent: number) {
+    if (available === null) return null
+    return (
+      (atomsFromPercent(available, percent) / amountPrecision) * amountPrecision
+    )
+  }
+  function selectPercent(percent: number) {
+    const next = amountAtPercent(percent)
+    if (next === null) return
+    setAmount(formatAtomsToInput(next, decimals))
+    setError(null)
+  }
+  function adjustAmount(direction: -1 | 1) {
+    if (maximumAmount === null || maximumAmount <= 0n) return
+    // Screen-reader adjustments must advance by at least one displayed unit.
+    const step = amountAtPercent(1) || amountPrecision
+    const next = (atoms ?? 0n) + BigInt(direction) * step
+    setAmount(
+      formatAtomsToInput(
+        next < 0n ? 0n : next > maximumAmount ? maximumAmount : next,
+        decimals,
+      ),
+    )
     setError(null)
   }
   function review() {
@@ -558,14 +587,7 @@ export default function TradeScreen() {
                   {wallet.address && (
                     <View style={s.inline}>
                       {[25, 50, 75, 100].map((percent) => {
-                        const precision =
-                          10n ** BigInt(decimals - (isBuy ? 2 : 3))
-                        const chipAtoms =
-                          available === null
-                            ? null
-                            : (atomsFromPercent(available, percent) /
-                                precision) *
-                              precision
+                        const chipAtoms = amountAtPercent(percent)
                         const selected = hasAmount && atoms === chipAtoms
                         return (
                           <Pressable
@@ -577,12 +599,7 @@ export default function TradeScreen() {
                             }}
                             accessibilityLabel={`Use ${percent} percent of available balance`}
                             disabled={available === null}
-                            onPress={() => {
-                              setAmount(
-                                formatAtomsToInput(chipAtoms!, decimals),
-                              )
-                              setError(null)
-                            }}
+                            onPress={() => selectPercent(percent)}
                             style={[
                               s.percent,
                               selected && { borderColor: colors.controlBorder },
@@ -602,6 +619,19 @@ export default function TradeScreen() {
                     </View>
                   )}
                 </View>
+              )}
+              {wallet.address && (
+                <AmountSlider
+                  label={`${isBuy ? 'Buy with' : 'Sell'} ${inputToken} amount`}
+                  value={
+                    maximumAmount && atoms !== null && atoms >= maximumAmount
+                      ? 100
+                      : toSliderPercent(atoms, available)
+                  }
+                  disabled={maximumAmount === null || maximumAmount <= 0n}
+                  onChange={selectPercent}
+                  onAdjust={adjustAmount}
+                />
               )}
             </View>
             <View style={s.duration}>
