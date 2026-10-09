@@ -1,5 +1,0 @@
-packages:
-  - .
-ignoreScripts: true
-overrides:
-  '@solana/kit': 6.5.0

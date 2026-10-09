@@ -1,73 +1,70 @@
-# mato mobile
+# mato mobile · Flutter
 
-Native Android client for the `mato-ui` **v1** SOL/USDC streaming exchange. Built with Expo 57, React Native 0.86, Solana Kit 6, and Solana Mobile Wallet Adapter. The phone interface follows the `mato-design` handover, with its dark surfaces, IBM Plex Sans typography, orange charts, compact stream lists, and bottom sheets. The verified mainnet market, generated program client, and settlement arithmetic are retained.
+Native Flutter client for mato's SOL/USDC streaming exchange. This branch replaces React Native with Dart widgets, a Dart protocol client, and a Kotlin bridge to the official Solana Mobile Wallet Adapter SDK. Android supports wallet signing; iOS and web provide a read-only market experience.
 
 ## Run
 
-Use Node 24 and pnpm 12.3.4. Install Android Studio and **JDK 17** for local Android builds. In Android Studio's SDK Manager, install Android SDK Platform 36, Build-Tools 36.0.0, NDK 27.1.12297006, CMake 3.22.1, Platform-Tools, and an emulator system image (ARM64 on Apple Silicon). Connect an Android device or start an emulator; wallet connection additionally requires an MWA-compatible wallet on that device.
+Use **Flutter 3.47.6 / Dart 3.13.5**, Android Studio, and a JDK supported by Gradle 9.3.1 (JDK 17 or newer). Install Android SDK Platform **37**, Build Tools 36.0.0, and NDK **28.2.13676358**. Target SDK remains 36; the wallet dependency requires compile SDK 37. Android native sources are checked in.
 
 ```sh
-pnpm install --frozen-lockfile --ignore-scripts
-cp .env.example .env
-pnpm android
+./tool/flutterw pub get
+./tool/flutterw run
 ```
 
-`pnpm android` generates/builds the native app and starts Metro. For subsequent development sessions, use `pnpm start`. **Expo Go is unsupported:** MWA and native crypto require a development build. Wallet connection is Android-only; iOS and web render a read-only preview.
+`tool/flutterw` uses `MATO_FLUTTER_SDK`, Flutter on PATH, or the project-local `.tools/flutter` SDK. On a new machine, install Flutter normally or run `./tool/bootstrap_flutter.sh` to install the pinned SDK in `.tools/`.
 
-The Android launcher selects an installed JDK 17, including a JDK previously downloaded by Gradle, and sets `JAVA_HOME` only for the build process. Check its selection with `pnpm android --check-java`. It does not install Java or edit your shell profile. For builds launched inside Android Studio, select the same JDK 17 under **Settings → Build, Execution, Deployment → Build Tools → Gradle → Gradle JDK**.
-
-On macOS, configure the SDK location in your terminal if needed:
+Connect a device or start an Android emulator. Signing requires an installed MWA-compatible wallet. Release builds retain application ID `markets.mato.mobile`; debug builds use `markets.mato.mobile.flutter` so they can coexist with the React Native app. Wallets keep the private keys.
 
 ```sh
-export ANDROID_HOME="$HOME/Library/Android/sdk"
-export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
+./tool/flutterw analyze
+./tool/flutterw test
+./tool/flutterw build apk --debug
+./tool/flutterw run -d chrome                  # read-only browser preview
+./tool/flutterw build web --release
+./tool/flutterw pub run tool/verify_mainnet.dart # read-only network checks
 ```
 
-If `configureCMakeDebug` fails with `WARNING: A restricted method in java.lang.System has been called`, the build may be using Java 25 from Android Studio. Prefab's child Java process emits a native-access warning that the Android Gradle plugin interprets as an error. Use JDK 17, as [React Native recommends](https://reactnative.dev/docs/0.86/set-up-your-environment#java-development-kit); `pnpm android` handles this selection. General Gradle support for Java 25 does not mean all Android native build tools support it. See the [upstream Prefab warning fix](https://android.googlesource.com/platform/tools/base/%2B/7363aa09c7a3a92f538e398fee6a47218ed3a373).
+The APK is `build/app/outputs/flutter-apk/app-debug.apk`. See [release validation](docs/RELEASE.md) before distribution or mainnet device acceptance.
+
+## Configuration
+
+Flutter uses compile-time Dart defines, not Expo environment variables. Defaults retain the existing backend, public mainnet RPC, pinned program, and enabled Android trading. Each mutation requires explicit user action and wallet approval.
 
 ```sh
-pnpm web                 # browser preview
-pnpm check               # TypeScript + domain/protocol/wallet tests
-pnpm export:android      # Android Hermes bundle; does not compile an APK
-pnpm export:web          # browser bundle
-pnpm format:check
-pnpm mainnet:verify      # read-only backend/cluster health check
+cp config.example.json config.local.json
+./tool/flutterw run --dart-define-from-file=config.local.json
+# Explicitly read-only build:
+./tool/flutterw run --dart-define=ENABLE_TRANSACTIONS=false
 ```
+
+| Define | Default |
+| --- | --- |
+| `READ_API_URL` | `https://read-api-production-f8ea.up.railway.app` |
+| `RPC_URL` | `https://api.mainnet-beta.solana.com` |
+| `ENABLE_TRANSACTIONS` | `true` |
+| `VERIFIED_PROGRAM_ID` | `TwobwMYkKbT8uMWqgPrEPXTPoyYsKAPmaWun6T2WT4A` |
+
+Endpoints must use HTTPS. Defines are public in the binary; use a credential-free RPC proxy for production. Public RPC requests can be rate-limited. Missing or stale market data is shown explicitly and blocks affected mutations. The sole supported market remains `FUDH6hiwDNjdQKbH7fveFFPoEE3mXk9i1g2WbgnSqob3`.
 
 ## Included
 
-- Trade: live SOL/USDC price, line/candle charts, 1H/1D/1W ranges, order book and side filter.
-- Streams: buy/sell, grouped inputs with exact atom amounts, 25/50/75/Max balance shortcuts, automatic duration, a Customize sheet with a live-liquidity impact curve, 5-second to 1-year durations, expandable rate/impact details, and a frozen review before wallet approval.
-- Positions: active streams, authoritative fill/refund accounting, pause/resume, withdrawal, simulated settlement review, and batch closing up to two ended streams.
-- History: pagination, fees, refunds, net receipts, explorer links, price history with start/average fill references, and actual/explicitly estimated dates.
-- Wallet: address copy and disconnect in a sheet; Balances and account opens balances, interval-account inventory, and reclaiming eligible rent in batches of ten.
-- Native behavior: a single order-first trading page, Active/Closed position drawers, safe areas, keyboard-aware forms, accessible controls, pull-to-refresh, foreground/focused-screen polling, reconnect handling and visible request errors.
+- Dark phone interface with bundled IBM Plex Sans, exact amount input, buy/sell, balance shortcuts and slider, automatic/customized duration, impact curve and frozen review.
+- Live prices, line/candle charts, 1H/1D/1W ranges, filtered order book, pull-to-refresh and foreground polling.
+- Active/closed streams, fill/refund accounting, pause/resume, withdrawal, simulated close receipts, batch closing two positions, paginated history, price-history charts and explorer links.
+- Wallet connection/restoration, copy/disconnect, balances, funded account inventory and rent reclaim batches of ten.
+- Mainnet genesis/program/market verification, integer token atoms, canonical token accounts, SOL wrapping, fee reserves, simulation before signing, account-change guards and a lock through confirmation. Ambiguous confirmations retain their signature and are never automatically retried.
 
-The handover's simulated NVDAx market is adapted to the supported SOL/USDC market. Limit prices are not shown because the current program has no limit-price parameter. Customize uses real market liquidity and retains the existing duration recommendation; it does not invent the prototype's 30-day movement counts or fee quote. Active and closed stream sheets load recorded market-price history over the stream's slot range, with the position's average fill shown separately. Open sheets refresh history to pick up late indexed updates; the plotted range stops at the current slot, pause, completion, or early-close boundary. The API does not provide individual fill transactions or past pause intervals; the chart is labeled as market prices during the stream. Wallet actions retain a combined approval/confirmation state because the native adapter does not expose separate UI phases. Transaction toasts link to the real signature.
+The Android bridge uses official `mobile-wallet-adapter-clientlib-ktx:2.2.0`. Authorization stays in native AES-GCM storage encrypted by Android Keystore and excluded from backup. Only loopback HTTP is allowed for MWA; remote APIs require HTTPS. See [wallet integration](lib/wallet/README.md).
 
-## Mainnet configuration
+## Structure and provenance
 
-Android trading is enabled by default in local development and all EAS profiles. Each order still requires review and approval in the connected wallet. Set `EXPO_PUBLIC_ENABLE_TRANSACTIONS=false` to explicitly build a read-only client. The program ID remains pinned; an explicitly supplied `EXPO_PUBLIC_VERIFIED_PROGRAM_ID` must match `TwobwMYkKbT8uMWqgPrEPXTPoyYsKAPmaWun6T2WT4A`. Web and iOS still provide a visual preview because wallet signing is Android-only.
+- `lib/ui/`: trading, account, chart and stream widgets.
+- `lib/state/`: lifecycle polling, resource errors and wallet-scoped state.
+- `lib/data/`, `lib/domain/`: API/RPC models, exact arithmetic, duration and settlement replay.
+- `lib/protocol/`: wire codecs, PDAs, instructions and transaction lifecycle.
+- `lib/wallet/` and `android/app/src/main/kotlin/markets/mato/mobile/`: Dart interface and Kotlin bridge.
+- `idl/`: original IDL; `test/protocol/fixtures/`: independent Codama bytes and a live-account fixture.
 
-All `EXPO_PUBLIC_*` configuration is public inside the app binary. Use a credential-free HTTPS RPC proxy that keeps provider secrets on your server. The public mainnet RPC is a development fallback with rate limits and possible browser-origin restrictions; production needs a reliable endpoint. The read API has its own availability and latency. No prices, balances or histories are fabricated when a service is unavailable.
+Ported from React Native commit `6e606f4cea213f2b7810c43c7f3376037932b337`, itself based on mato-ui v1 protocol snapshot `482502e`. The original implementation remains on `main`. Constants remain `ARRAY_LENGTH=16`, `END_SLOT_INTERVAL=11`, and assumed slot duration 200 ms. No JavaScript runtime, WebView, or Node build dependency is used.
 
-Before each mutation, the app verifies the RPC's full mainnet genesis hash, deployed executable program, market owner, market ID and mints. Integer atom arithmetic, idempotent receiving-token-account creation, SOL wrapping, fee reserves, simulation, and confirmed settlement are preserved. A shared transaction lock prevents concurrent submissions. Confirmation errors retain the signature so a submitted transaction can be checked before retrying.
-
-Wallets keep private keys. Authorization is stored in encrypted SecureStore, excluded from Android backups, and bound to the selected account. The app reauthorizes before signing; changed or revoked accounts require a new review. A release still requires protocol/security review and real-device validation; automated checks do not establish contract safety.
-
-## Architecture and provenance
-
-- `src/screens/`: native Trade, Positions and Account screens.
-- `src/wallet/`: Android MWA provider, secure cache, signer and platform fallbacks.
-- `src/features/trading/`: v1 protocol/data port and its regression tests.
-- `src/features/orders/`: mobile order validation.
-- `src/lib/generated/` and `src/lib/idl/`: checked-in v1 client/IDL; do not replace with another program's IDL.
-- `src/config.ts`: pinned network identity and transaction policy.
-
-Ported from `Nachtschatten-Labs/mato-ui` branch `v1`, protocol snapshot `482502e`. The subsequent v1 commit `de6f9dd` only changes web closed-row spacing; native history uses its own cards. Source constants remain `ARRAY_LENGTH=16`, `END_SLOT_INTERVAL=11`, with a 200 ms assumed slot duration. The sole supported market is `FUDH6hiwDNjdQKbH7fveFFPoEE3mXk9i1g2WbgnSqob3`.
-
-After refreshing the checked-in Codama client, run `pnpm twob:fix-imports` and `pnpm check`. The fix extracts the generated program address into `twob/program-address.ts` and redirects instruction/error imports to it, preserving the existing public exports. This removes the Metro require cycle between the program helpers and instruction builders. The command is safe to rerun; the import-graph regression check detects cycles reintroduced by a client refresh.
-
-Dependencies are exactly pinned and lifecycle scripts are disabled in `pnpm-workspace.yaml`. TypeScript 5.9 is intentionally retained for Kit 6's declared peer range instead of Expo's suggested TypeScript 6. Native folders are generated by Expo and ignored; change `app.config.ts` rather than editing generated native files.
-
-See [release validation](docs/RELEASE.md) for device checks and build preparation, and [wallet integration](src/wallet/README.md) for the Solana Mobile documentation links.
+Tests compare instructions against original Codama output, check the IDL wire contract, independently decode transactions, and exercise exact amounts, settlement, transaction guards, wallet failures and screen states. Real-wallet acceptance remains necessary.

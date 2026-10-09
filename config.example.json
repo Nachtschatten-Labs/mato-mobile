@@ -1,0 +1,6 @@
+{
+  "READ_API_URL": "https://read-api-production-f8ea.up.railway.app",
+  "RPC_URL": "https://api.mainnet-beta.solana.com",
+  "ENABLE_TRANSACTIONS": "true",
+  "VERIFIED_PROGRAM_ID": "TwobwMYkKbT8uMWqgPrEPXTPoyYsKAPmaWun6T2WT4A"
+}

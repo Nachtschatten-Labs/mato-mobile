@@ -1,0 +1,13 @@
+#!/bin/sh
+set -eu
+project_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+if [ -n "${MATO_FLUTTER_SDK:-}" ]; then
+  exec "$MATO_FLUTTER_SDK/bin/flutter" "$@"
+elif command -v flutter >/dev/null 2>&1; then
+  exec flutter "$@"
+elif [ -x "$project_dir/.tools/flutter/bin/flutter" ]; then
+  exec "$project_dir/.tools/flutter/bin/flutter" "$@"
+else
+  echo 'Flutter is not installed. Run ./tool/bootstrap_flutter.sh or install Flutter 3.47.6.' >&2
+  exit 1
+fi

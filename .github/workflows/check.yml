@@ -1,4 +1,4 @@
-name: Mobile checks
+name: Flutter checks
 
 on:
   push:
@@ -12,18 +12,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-java@v4
         with:
-          version: 12.3.4
-      - uses: actions/setup-node@v4
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
         with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile --ignore-scripts
-      - run: pnpm check
-      - run: pnpm format:check
-      - run: pnpm exec expo install --check
-      - run: pnpm export:android
-        env:
-          EXPO_NO_TELEMETRY: '1'
-          EXPO_PUBLIC_ENABLE_TRANSACTIONS: 'false'
+          flutter-version: '3.47.6'
+          channel: stable
+          cache: true
+      - run: flutter pub get --enforce-lockfile
+      - run: dart format --output=none --set-exit-if-changed lib test tool
+      - run: flutter analyze
+      - run: flutter test
+      - run: flutter build apk --debug --dart-define=ENABLE_TRANSACTIONS=false
+      - run: flutter build web --release
