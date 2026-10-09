@@ -79,7 +79,7 @@ void main() {
     'phone trade form preserves exact input and resets on side change',
     (tester) async {
       await pumpApp(tester);
-      expect(find.text('mato'), findsOneWidget);
+      expect(find.bySemanticsLabel('mato'), findsOneWidget);
       expect(find.text('Open on Android to connect'), findsOneWidget);
       await tester.enterText(find.byType(TextField), '123.456789');
       await tester.pump();
@@ -99,13 +99,21 @@ void main() {
     tester,
   ) async {
     await pumpApp(tester, width: 320);
-    await tester.tap(find.text('Auto'));
+    await tester.enterText(find.byType(TextField), '100');
+    await tester.pump();
+    final customize = find.bySemanticsLabel(RegExp(r'^Customize duration:'));
+    await tester.ensureVisible(customize);
+    await tester.tap(customize);
     await tester.pumpAndSettle();
-    expect(find.text('Customize your stream'), findsOneWidget);
-    await tester.ensureVisible(find.text('Use this duration'));
-    await tester.tap(find.text('Use this duration'));
+    expect(find.text('Customize duration'), findsOneWidget);
+    final use = find.ancestor(
+      of: find.textContaining(RegExp(r'^Use ')),
+      matching: find.byType(FilledButton),
+    );
+    await tester.ensureVisible(use);
+    await tester.tap(use);
     await tester.pumpAndSettle();
-    expect(find.text('Reset to mato’s pick'), findsOneWidget);
+    expect(find.text('Customize duration'), findsNothing);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });

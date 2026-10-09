@@ -48,7 +48,7 @@ class AppController extends ChangeNotifier {
   int _accountEpoch = 0;
   int _chartEpoch = 0;
   String? _owner;
-  String range = '1H';
+  String range = '1D';
   bool bookVisible = false;
   bool historyVisible = false;
   String? lastSignature;

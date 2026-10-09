@@ -48,13 +48,16 @@ Endpoints must use HTTPS. Defines are public in the binary; use a credential-fre
 
 ## Included
 
-- Dark phone interface with bundled IBM Plex Sans, exact amount input, buy/sell, balance shortcuts and slider, automatic/customized duration, impact curve and frozen review.
+- Dark Forest phone interface matching mato-ui v1, with the supplied mint logo, bundled IBM Plex Sans, exact amount input, buy/sell, expandable balance shortcuts and slider, automatic/customized duration, fee-aware estimates, impact curve and frozen review.
 - Live prices, line/candle charts, 1H/1D/1W ranges, filtered order book, pull-to-refresh and foreground polling.
 - Active/closed streams, fill/refund accounting, pause/resume, withdrawal, simulated close receipts, batch closing two positions, paginated history, price-history charts and explorer links.
 - Wallet connection/restoration, copy/disconnect, balances, funded account inventory and rent reclaim batches of ten.
+- Daily risk acknowledgement, compact wallet sheets and transaction toasts with an eight-second countdown and explorer links.
 - Mainnet genesis/program/market verification, integer token atoms, canonical token accounts, SOL wrapping, fee reserves, simulation before signing, account-change guards and a lock through confirmation. Ambiguous confirmations retain their signature and are never automatically retried.
 
 The Android bridge uses official `mobile-wallet-adapter-clientlib-ktx:2.2.0`. Authorization stays in native AES-GCM storage encrypted by Android Keystore and excluded from backup. Only loopback HTTP is allowed for MWA; remote APIs require HTTPS. See [wallet integration](lib/wallet/README.md).
+
+See [mobile design comparison and verification](docs/DESIGN_PARITY.md) for the v1 reference, visual baselines and native platform differences.
 
 ## Structure and provenance
 
