@@ -7,6 +7,7 @@ import 'data/market_repository.dart';
 import 'state/app_controller.dart';
 import 'wallet/wallet_service.dart';
 import 'ui/account_sheet.dart';
+import 'ui/brand.dart';
 import 'ui/theme.dart';
 import 'ui/trade_screen.dart';
 import 'ui/widgets.dart';
@@ -111,39 +112,55 @@ class _HomeState extends State<_Home> {
   }
 
   Future<void> _onboarding() async {
+    if (!widget.app.config.transactionsEnabled) return;
+    SharedPreferences? prefs;
+    final today = DateTime.now().toUtc().toIso8601String().substring(0, 10);
     try {
-      final prefs = await SharedPreferences.getInstance();
-      if (prefs.getBool('mato.intro.seen') == true || !mounted) return;
-      await showMatoSheet<void>(
-        context,
-        title: 'A little at a time.',
-        child: Column(
+      prefs = await SharedPreferences.getInstance();
+      if (prefs.getString('mato-risk-disclaimer-accepted') == today) return;
+    } catch (_) {
+      // Still show the acknowledgement if persistence is unavailable.
+    }
+    if (!mounted) return;
+    await showMatoSheet<void>(
+      context,
+      title: 'Experimental Protocol',
+      dismissible: false,
+      showClose: false,
+      child: Builder(
+        builder: (sheetContext) => Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
-              'Trade without picking a single moment.',
-              style: TextStyle(fontSize: 28, height: 1.2, letterSpacing: -.8),
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Icon(
+                Icons.warning_amber_rounded,
+                color: MatoColors.caution,
+                size: 22,
+              ),
             ),
-            const SizedBox(height: 22),
+            const SizedBox(height: 12),
             const Text(
-              'Choose an amount. Mato spreads your trade over time, using continuous clearing auctions on Solana.',
-              style: TextStyle(color: MatoColors.secondary, height: 1.6),
+              'This application is in an early experimental phase. Liquidity is low and smart contracts have not been fully audited. There is a significant risk of losing some or all of your funds.',
+              style: TextStyle(
+                color: MatoColors.muted,
+                fontSize: 14,
+                height: 1.5,
+              ),
             ),
-            const SizedBox(height: 16),
-            const Detail('01', 'Choose SOL or USDC'),
-            const Detail('02', 'Set your amount and duration'),
-            const Detail('03', 'Review and approve in your wallet'),
-            const SizedBox(height: 22),
+            const SizedBox(height: 24),
             ActionButton(
-              'Explore mato',
-              onPressed: () => Navigator.pop(context),
+              'I understand the risks',
+              onPressed: () => Navigator.pop(sheetContext),
             ),
           ],
         ),
-      );
-      await prefs.setBool('mato.intro.seen', true);
+      ),
+    );
+    try {
+      await prefs?.setString('mato-risk-disclaimer-accepted', today);
     } catch (_) {
-      /* An unavailable preferences store must not block trading UI. */
+      // A storage failure must not prevent the acknowledged session.
     }
   }
 
@@ -152,55 +169,59 @@ class _HomeState extends State<_Home> {
     animation: widget.app,
     builder: (context, _) {
       final app = widget.app;
-      return Scaffold(
-        appBar: AppBar(
-          toolbarHeight: 76,
-          title: const Padding(
-            padding: EdgeInsets.only(left: 5),
-            child: Text(
-              'mato',
-              style: TextStyle(
-                fontSize: 31,
-                fontWeight: FontWeight.w500,
-                letterSpacing: -1.5,
-              ),
-            ),
-          ),
-          actions: [
-            Padding(
-              padding: const EdgeInsets.only(right: 20),
-              child: TextButton.icon(
-                onPressed: () => showMatoSheet(
-                  context,
-                  title: app.wallet.isConnected
-                      ? 'Your wallet'
-                      : 'Connect wallet',
-                  child: AccountSheet(app: app),
-                ),
-                style: TextButton.styleFrom(
-                  backgroundColor: MatoColors.elevated,
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(24),
+      return ForestBackdrop(
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          appBar: AppBar(
+            toolbarHeight: 80,
+            title: const MatoLogo(),
+            actions: [
+              Padding(
+                padding: const EdgeInsets.only(right: 16),
+                child: TextButton(
+                  onPressed: () => showMatoSheet(
+                    context,
+                    title: app.wallet.isConnected
+                        ? 'Your wallet'
+                        : 'Connect wallet',
+                    child: AccountSheet(app: app),
+                  ),
+                  style: TextButton.styleFrom(
+                    backgroundColor: MatoColors.elevated,
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.account_balance_wallet_outlined,
+                        size: 14,
+                        color: MatoColors.muted,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        app.wallet.address == null
+                            ? 'Connect wallet'
+                            : shortAddress(app.wallet.address!),
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      const SizedBox(width: 12),
+                      const Icon(
+                        Icons.keyboard_arrow_down,
+                        size: 14,
+                        color: MatoColors.muted,
+                      ),
+                    ],
                   ),
                 ),
-                icon: Icon(
-                  app.wallet.isConnected
-                      ? Icons.account_balance_wallet_outlined
-                      : Icons.account_balance_wallet_outlined,
-                  size: 16,
-                ),
-                label: Text(
-                  app.wallet.address == null
-                      ? 'Connect wallet'
-                      : shortAddress(app.wallet.address!),
-                  style: const TextStyle(fontSize: 12),
-                ),
               ),
-            ),
-          ],
+            ],
+          ),
+          body: SafeArea(top: false, child: TradeScreen(app: app)),
         ),
-        body: SafeArea(top: false, child: TradeScreen(app: app)),
       );
     },
   );

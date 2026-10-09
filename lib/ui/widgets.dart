@@ -1,6 +1,8 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'theme.dart';
+export 'mato_toast.dart';
 
 class Panel extends StatelessWidget {
   const Panel({
@@ -14,9 +16,9 @@ class Panel extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: padding,
     decoration: BoxDecoration(
-      color: MatoColors.panel,
+      color: MatoColors.panelTranslucent,
       border: Border.all(color: MatoColors.border),
-      borderRadius: BorderRadius.circular(22),
+      borderRadius: BorderRadius.circular(20),
     ),
     child: child,
   );
@@ -124,6 +126,10 @@ class ActionButton extends StatelessWidget {
       child: secondary
           ? FilledButton.tonal(
               onPressed: busy ? null : onPressed,
+              style: FilledButton.styleFrom(
+                backgroundColor: MatoColors.elevated,
+                foregroundColor: MatoColors.secondary,
+              ),
               child: content,
             )
           : FilledButton(onPressed: busy ? null : onPressed, child: content),
@@ -144,15 +150,37 @@ class TokenBadge extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: symbol == 'SOL'
-            ? const Color(0xff202326)
-            : const Color(0xff2775ca),
+            ? const Color(0xff282331)
+            : symbol == 'USDC'
+            ? const Color(0xff2775ca)
+            : MatoColors.track,
       ),
       alignment: Alignment.center,
       child: symbol == 'SOL'
-          ? CustomPaint(size: Size(size * .57, size * .48), painter: _SolMark())
+          ? CustomPaint(size: Size.square(size * .68), painter: _SolMark())
+          : symbol == 'USDC'
+          ? CustomPaint(
+              painter: _UsdcRing(),
+              child: SizedBox.square(
+                dimension: size * .72,
+                child: Center(
+                  child: Text(
+                    r'$',
+                    style: TextStyle(
+                      fontSize: size * 14 / 24,
+                      height: 1,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            )
           : Text(
-              '\$',
-              style: TextStyle(fontSize: size * .7, color: Colors.white),
+              symbol.substring(0, 1),
+              style: TextStyle(
+                fontSize: size * .42,
+                fontWeight: FontWeight.w500,
+              ),
             ),
     ),
   );
@@ -161,27 +189,38 @@ class TokenBadge extends StatelessWidget {
 class _SolMark extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..shader = const LinearGradient(
-        begin: Alignment.topRight,
-        end: Alignment.bottomLeft,
-        colors: [Color(0xff80ecb3), Color(0xffa986e8)],
-      ).createShader(Offset.zero & size);
+    canvas.scale(size.width / 24, size.height / 24);
+    const colors = [Color(0xff9ce0c4), Color(0xffb3accf), Color(0xffbd9ce8)];
     for (var i = 0; i < 3; i++) {
-      final y = i * size.height / 3;
-      final inset = size.width * .15;
+      final y = 5 + i * 5.5;
       final path = Path()
-        ..moveTo(i == 1 ? 0 : inset, y)
-        ..lineTo(i == 1 ? size.width - inset : size.width, y)
-        ..lineTo(i == 1 ? size.width : size.width - inset, y + size.height * .2)
-        ..lineTo(i == 1 ? inset : 0, y + size.height * .2)
+        ..moveTo(i == 1 ? 3 : 6, y)
+        ..lineTo(i == 1 ? 17 : 20, y)
+        ..lineTo(i == 1 ? 20 : 17, y + 3)
+        ..lineTo(i == 1 ? 6 : 3, y + 3)
         ..close();
-      canvas.drawPath(path, paint);
+      canvas.drawPath(path, Paint()..color = colors[i]);
     }
   }
 
   @override
   bool shouldRepaint(_SolMark oldDelegate) => false;
+}
+
+class _UsdcRing extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xbfffffff)
+      ..strokeWidth = 1
+      ..style = PaintingStyle.stroke;
+    final rect = (Offset.zero & size).deflate(.5);
+    canvas.drawArc(rect, -math.pi / 3, 2 * math.pi / 3, false, paint);
+    canvas.drawArc(rect, 2 * math.pi / 3, 2 * math.pi / 3, false, paint);
+  }
+
+  @override
+  bool shouldRepaint(_UsdcRing oldDelegate) => false;
 }
 
 class PillTabs<T> extends StatelessWidget {
@@ -207,17 +246,17 @@ class PillTabs<T> extends StatelessWidget {
                   color: selected == entry.key
                       ? MatoColors.elevated
                       : Colors.transparent,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(40),
                   child: InkWell(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(40),
                     onTap: () => onChanged(entry.key),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
                       child: Text(
                         entry.value,
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: 15,
+                          fontSize: 14,
                           color: selected == entry.key
                               ? MatoColors.text
                               : MatoColors.muted,
@@ -238,31 +277,58 @@ Future<T?> showMatoSheet<T>(
   BuildContext context, {
   required String title,
   required Widget child,
+  bool dismissible = true,
+  bool showClose = true,
 }) => showModalBottomSheet<T>(
   context: context,
   isScrollControlled: true,
+  isDismissible: dismissible,
+  enableDrag: dismissible,
   useSafeArea: true,
-  showDragHandle: true,
+  showDragHandle: dismissible,
   constraints: const BoxConstraints(maxWidth: 640),
-  builder: (context) => Padding(
-    padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-    child: ConstrainedBox(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.sizeOf(context).height * .86,
-      ),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(24, 0, 24, 28),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(fontSize: 23, letterSpacing: -.5),
-            ),
-            const SizedBox(height: 22),
-            child,
-          ],
+  builder: (context) => PopScope(
+    canPop: dismissible,
+    child: Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight:
+              (MediaQuery.sizeOf(context).height -
+                  MediaQuery.viewInsetsOf(context).bottom) *
+              .92,
+        ),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            dismissible ? 0 : 24,
+            20,
+            20 + MediaQuery.paddingOf(context).bottom,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: const TextStyle(fontSize: 16, letterSpacing: -.2),
+                    ),
+                  ),
+                  if (showClose && dismissible)
+                    IconButton(
+                      tooltip: 'Close',
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close, size: 18),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              child,
+            ],
+          ),
         ),
       ),
     ),
@@ -271,13 +337,21 @@ Future<T?> showMatoSheet<T>(
 
 String shortAddress(String address) => address.length < 14
     ? address
-    : '${address.substring(0, 5)}…${address.substring(address.length - 5)}';
+    : '${address.substring(0, 4)}…${address.substring(address.length - 4)}';
 String errorText(Object error) => error.toString().replaceFirst(
   RegExp(r'^(Exception|StateError|Bad state): '),
   '',
 );
-String number(double? value, [int decimals = 2]) =>
-    value == null || !value.isFinite ? '—' : value.toStringAsFixed(decimals);
+String number(double? value, [int decimals = 2]) {
+  if (value == null || !value.isFinite) return '—';
+  final parts = value.abs().toStringAsFixed(decimals).split('.');
+  final whole = parts.first.replaceAllMapped(
+    RegExp(r'\B(?=(\d{3})+(?!\d))'),
+    (_) => ',',
+  );
+  return '${value < 0 ? '−' : ''}$whole${parts.length == 2 ? '.${parts.last}' : ''}';
+}
+
 String durationText(num seconds) {
   if (seconds < 60) return '${seconds.ceil()} sec';
   if (seconds < 3600) return '${(seconds / 60).ceil()} min';

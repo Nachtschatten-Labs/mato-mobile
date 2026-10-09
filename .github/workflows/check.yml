@@ -25,5 +25,11 @@ jobs:
       - run: dart format --output=none --set-exit-if-changed lib test tool
       - run: flutter analyze
       - run: flutter test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: flutter-visual-diffs
+          path: test/ui/failures/
+          if-no-files-found: ignore
       - run: flutter build apk --debug --dart-define=ENABLE_TRANSACTIONS=false
       - run: flutter build web --release
