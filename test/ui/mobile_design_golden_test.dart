@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -18,9 +19,12 @@ void main() {
   for (final width in [320.0, 390.0]) {
     testWidgets('Dark Forest trade at ${width.toInt()}px', (tester) async {
       await pumpApp(tester, width: width);
+      // Font rasterization differs between the Linux CI and macOS Skia hosts.
+      // Keep exact pixel comparisons against reviewed baselines for each host.
+      final goldenDirectory = Platform.isLinux ? 'goldens/linux' : 'goldens';
       await expectLater(
         find.byType(MatoApp),
-        matchesGoldenFile('goldens/trade-${width.toInt()}.png'),
+        matchesGoldenFile('$goldenDirectory/trade-${width.toInt()}.png'),
       );
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
