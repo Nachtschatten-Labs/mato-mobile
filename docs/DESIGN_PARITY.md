@@ -26,7 +26,7 @@ Reference: `mato-ui` branch `v1`, commit `1ecc381`, and the 9 October 2026 Dark 
 
 The focused tests exercise 320px and 390px layouts, exact amount entry, side reset, duration apply/reset, fee-aware quotes, active/closed stream expansion, authoritative zero settlements, wallet cancellation/retry, copy feedback, chart selection and invalid data, keyboard-safe sheets, risk acceptance and toast lifecycle. The existing protocol, domain, controller and wallet suites remain in the full test run.
 
-Visual baselines in `test/ui/goldens/` load the bundled font and render deterministic fixture data. Inspect them after running:
+Visual baselines in `test/ui/goldens/` load the bundled font and render deterministic fixture data. macOS baselines live directly there; Linux baselines live in `goldens/linux/`. Both use exact pixel comparisons. The host-specific files account for font rasterization differences, and CI uploads visual differences on failure. Inspect them after running:
 
 ```sh
 ./tool/flutterw test test/ui/mobile_design_golden_test.dart --update-goldens
