@@ -69,7 +69,7 @@ class AppController extends ChangeNotifier {
     _owner = wallet.address;
     await refresh();
     if (!_disposed) {
-      _poll = Timer.periodic(const Duration(seconds: 10), (_) {
+      _poll = Timer.periodic(const Duration(seconds: 1), (_) {
         if (_foreground) unawaited(refresh());
       });
     }
